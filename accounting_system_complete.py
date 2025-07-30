@@ -766,19 +766,650 @@ def add_customer():
 @login_required
 def suppliers():
     suppliers = Supplier.query.all()
-    return f"<h1>إدارة الموردين</h1><p>عدد الموردين: {len(suppliers)}</p><a href='/dashboard'>العودة للوحة التحكم</a>"
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>إدارة الموردين - نظام المحاسبة</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            body { background-color: #f8f9fa; }
+            .navbar { background: linear-gradient(45deg, #667eea, #764ba2) !important; }
+            .table-hover tbody tr:hover { background-color: #f8f9fa; }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-calculator me-2"></i>نظام المحاسبة
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="{{ url_for('dashboard') }}">
+                        <i class="fas fa-home me-1"></i>الرئيسية
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-truck me-2"></i>إدارة الموردين</h5>
+                    <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#addSupplierModal">
+                        <i class="fas fa-plus me-2"></i>إضافة مورد جديد
+                    </button>
+                </div>
+                <div class="card-body">
+                    {% if suppliers %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>#</th>
+                                    <th>اسم المورد</th>
+                                    <th>الهاتف</th>
+                                    <th>البريد الإلكتروني</th>
+                                    <th>العنوان</th>
+                                    <th>الرقم الضريبي</th>
+                                    <th>تاريخ الإضافة</th>
+                                    <th>الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for supplier in suppliers %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+                                    <td><strong>{{ supplier.name }}</strong></td>
+                                    <td>{{ supplier.phone or '-' }}</td>
+                                    <td>{{ supplier.email or '-' }}</td>
+                                    <td>{{ supplier.address or '-' }}</td>
+                                    <td>{{ supplier.tax_number or '-' }}</td>
+                                    <td>{{ supplier.created_at.strftime('%Y-%m-%d') if supplier.created_at else '-' }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-truck fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">لا توجد موردين مسجلين</h5>
+                        <p class="text-muted">ابدأ بإضافة مورد جديد</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal إضافة مورد -->
+        <div class="modal fade" id="addSupplierModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title"><i class="fas fa-plus me-2"></i>إضافة مورد جديد</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form method="POST" action="{{ url_for('add_supplier') }}">
+                        <div class="modal-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="name" class="form-label">اسم المورد *</label>
+                                        <input type="text" class="form-control" id="name" name="name" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="phone" class="form-label">رقم الهاتف</label>
+                                        <input type="text" class="form-control" id="phone" name="phone">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="email" class="form-label">البريد الإلكتروني</label>
+                                        <input type="email" class="form-control" id="email" name="email">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="tax_number" class="form-label">الرقم الضريبي</label>
+                                        <input type="text" class="form-control" id="tax_number" name="tax_number">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="address" class="form-label">العنوان</label>
+                                <textarea class="form-control" id="address" name="address" rows="3"></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <i class="fas fa-times me-2"></i>إلغاء
+                            </button>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save me-2"></i>حفظ المورد
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    </body>
+    </html>
+    ''', suppliers=suppliers)
+
+@app.route('/add_supplier', methods=['POST'])
+@login_required
+def add_supplier():
+    supplier = Supplier(
+        name=request.form['name'],
+        phone=request.form.get('phone'),
+        email=request.form.get('email'),
+        address=request.form.get('address'),
+        tax_number=request.form.get('tax_number')
+    )
+    db.session.add(supplier)
+    db.session.commit()
+    flash('تم إضافة المورد بنجاح', 'success')
+    return redirect(url_for('suppliers'))
 
 @app.route('/products')
 @login_required
 def products():
     products = Product.query.all()
-    return f"<h1>إدارة المنتجات</h1><p>عدد المنتجات: {len(products)}</p><a href='/dashboard'>العودة للوحة التحكم</a>"
+    low_stock_count = Product.query.filter(Product.quantity <= Product.min_quantity).count()
+
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>إدارة المنتجات والمخزون - نظام المحاسبة</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            body { background-color: #f8f9fa; }
+            .navbar { background: linear-gradient(45deg, #667eea, #764ba2) !important; }
+            .low-stock { background-color: #fff3cd !important; }
+            .out-of-stock { background-color: #f8d7da !important; }
+            .stock-badge {
+                font-size: 0.8em;
+                padding: 0.25em 0.5em;
+            }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-calculator me-2"></i>نظام المحاسبة
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="{{ url_for('dashboard') }}">
+                        <i class="fas fa-home me-1"></i>الرئيسية
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <!-- إحصائيات سريعة -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <i class="fas fa-box fa-2x mb-2"></i>
+                            <h4>{{ products|length }}</h4>
+                            <p class="mb-0">إجمالي المنتجات</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body text-center">
+                            <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
+                            <h4>{{ low_stock_count }}</h4>
+                            <p class="mb-0">منتجات منخفضة المخزون</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <i class="fas fa-dollar-sign fa-2x mb-2"></i>
+                            <h4>{{ "%.0f"|format(products|sum(attribute='price')|default(0)) }}</h4>
+                            <p class="mb-0">إجمالي قيمة الأسعار</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body text-center">
+                            <i class="fas fa-warehouse fa-2x mb-2"></i>
+                            <h4>{{ products|sum(attribute='quantity')|default(0) }}</h4>
+                            <p class="mb-0">إجمالي الكمية</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow">
+                <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-box me-2"></i>إدارة المنتجات والمخزون</h5>
+                    <button type="button" class="btn btn-dark" data-bs-toggle="modal" data-bs-target="#addProductModal">
+                        <i class="fas fa-plus me-2"></i>إضافة منتج جديد
+                    </button>
+                </div>
+                <div class="card-body">
+                    {% if products %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>#</th>
+                                    <th>اسم المنتج</th>
+                                    <th>الفئة</th>
+                                    <th>سعر البيع</th>
+                                    <th>سعر التكلفة</th>
+                                    <th>الكمية المتاحة</th>
+                                    <th>الحد الأدنى</th>
+                                    <th>حالة المخزون</th>
+                                    <th>الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for product in products %}
+                                <tr class="{% if product.quantity == 0 %}out-of-stock{% elif product.quantity <= product.min_quantity %}low-stock{% endif %}">
+                                    <td>{{ loop.index }}</td>
+                                    <td>
+                                        <strong>{{ product.name }}</strong>
+                                        {% if product.description %}
+                                        <br><small class="text-muted">{{ product.description[:50] }}...</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ product.category or '-' }}</td>
+                                    <td><strong>{{ "%.2f"|format(product.price) }} ر.س</strong></td>
+                                    <td>{{ "%.2f"|format(product.cost or 0) }} ر.س</td>
+                                    <td><span class="badge bg-primary">{{ product.quantity }}</span></td>
+                                    <td>{{ product.min_quantity }}</td>
+                                    <td>
+                                        {% if product.quantity == 0 %}
+                                        <span class="badge bg-danger stock-badge">نفد المخزون</span>
+                                        {% elif product.quantity <= product.min_quantity %}
+                                        <span class="badge bg-warning stock-badge">مخزون منخفض</span>
+                                        {% else %}
+                                        <span class="badge bg-success stock-badge">متوفر</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" title="تعديل">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-success" title="إضافة كمية">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" title="حذف">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-box fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">لا توجد منتجات مسجلة</h5>
+                        <p class="text-muted">ابدأ بإضافة منتج جديد لإدارة المخزون</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal إضافة منتج -->
+        <div class="modal fade" id="addProductModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-warning text-dark">
+                        <h5 class="modal-title"><i class="fas fa-plus me-2"></i>إضافة منتج جديد</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form method="POST" action="{{ url_for('add_product') }}">
+                        <div class="modal-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="name" class="form-label">اسم المنتج *</label>
+                                        <input type="text" class="form-control" id="name" name="name" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="category" class="form-label">الفئة</label>
+                                        <input type="text" class="form-control" id="category" name="category">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="description" class="form-label">وصف المنتج</label>
+                                <textarea class="form-control" id="description" name="description" rows="2"></textarea>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="price" class="form-label">سعر البيع *</label>
+                                        <input type="number" step="0.01" class="form-control" id="price" name="price" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="cost" class="form-label">سعر التكلفة</label>
+                                        <input type="number" step="0.01" class="form-control" id="cost" name="cost">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="quantity" class="form-label">الكمية الأولية</label>
+                                        <input type="number" class="form-control" id="quantity" name="quantity" value="0">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="min_quantity" class="form-label">الحد الأدنى للمخزون</label>
+                                        <input type="number" class="form-control" id="min_quantity" name="min_quantity" value="10">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <i class="fas fa-times me-2"></i>إلغاء
+                            </button>
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-save me-2"></i>حفظ المنتج
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    </body>
+    </html>
+    ''', products=products, low_stock_count=low_stock_count)
+
+@app.route('/add_product', methods=['POST'])
+@login_required
+def add_product():
+    product = Product(
+        name=request.form['name'],
+        description=request.form.get('description'),
+        category=request.form.get('category'),
+        price=float(request.form['price']),
+        cost=float(request.form.get('cost', 0)),
+        quantity=int(request.form.get('quantity', 0)),
+        min_quantity=int(request.form.get('min_quantity', 10))
+    )
+    db.session.add(product)
+    db.session.commit()
+    flash('تم إضافة المنتج بنجاح', 'success')
+    return redirect(url_for('products'))
 
 @app.route('/sales')
 @login_required
 def sales():
-    sales = SalesInvoice.query.all()
-    return f"<h1>فواتير المبيعات</h1><p>عدد الفواتير: {len(sales)}</p><a href='/dashboard'>العودة للوحة التحكم</a>"
+    sales = SalesInvoice.query.order_by(SalesInvoice.created_at.desc()).all()
+    customers = Customer.query.all()
+    total_sales = sum(sale.total for sale in sales)
+
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>فواتير المبيعات - نظام المحاسبة</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            body { background-color: #f8f9fa; }
+            .navbar { background: linear-gradient(45deg, #667eea, #764ba2) !important; }
+            .status-pending { color: #ffc107; }
+            .status-paid { color: #198754; }
+            .status-cancelled { color: #dc3545; }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-calculator me-2"></i>نظام المحاسبة
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="{{ url_for('dashboard') }}">
+                        <i class="fas fa-home me-1"></i>الرئيسية
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <!-- إحصائيات المبيعات -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card bg-info text-white">
+                        <div class="card-body text-center">
+                            <i class="fas fa-file-invoice fa-2x mb-2"></i>
+                            <h4>{{ sales|length }}</h4>
+                            <p class="mb-0">إجمالي الفواتير</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <i class="fas fa-dollar-sign fa-2x mb-2"></i>
+                            <h4>{{ "%.2f"|format(total_sales) }} ر.س</h4>
+                            <p class="mb-0">إجمالي المبيعات</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <i class="fas fa-users fa-2x mb-2"></i>
+                            <h4>{{ customers|length }}</h4>
+                            <p class="mb-0">العملاء المسجلين</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-file-invoice me-2"></i>فواتير المبيعات</h5>
+                    <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#addSaleModal">
+                        <i class="fas fa-plus me-2"></i>فاتورة جديدة
+                    </button>
+                </div>
+                <div class="card-body">
+                    {% if sales %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>رقم الفاتورة</th>
+                                    <th>العميل</th>
+                                    <th>التاريخ</th>
+                                    <th>المبلغ الفرعي</th>
+                                    <th>الضريبة</th>
+                                    <th>الإجمالي</th>
+                                    <th>الحالة</th>
+                                    <th>الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sale in sales %}
+                                <tr>
+                                    <td><strong>{{ sale.invoice_number }}</strong></td>
+                                    <td>{{ sale.customer.name if sale.customer else 'عميل نقدي' }}</td>
+                                    <td>{{ sale.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>{{ "%.2f"|format(sale.subtotal) }} ر.س</td>
+                                    <td>{{ "%.2f"|format(sale.tax_amount) }} ر.س</td>
+                                    <td><strong>{{ "%.2f"|format(sale.total) }} ر.س</strong></td>
+                                    <td>
+                                        <span class="badge
+                                        {% if sale.status == 'paid' %}bg-success
+                                        {% elif sale.status == 'pending' %}bg-warning
+                                        {% else %}bg-danger{% endif %}">
+                                        {% if sale.status == 'paid' %}مدفوعة
+                                        {% elif sale.status == 'pending' %}معلقة
+                                        {% else %}ملغية{% endif %}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" title="عرض">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-success" title="طباعة">
+                                            <i class="fas fa-print"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-file-invoice fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">لا توجد فواتير مبيعات</h5>
+                        <p class="text-muted">ابدأ بإنشاء فاتورة جديدة</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal إضافة فاتورة -->
+        <div class="modal fade" id="addSaleModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-info text-white">
+                        <h5 class="modal-title"><i class="fas fa-plus me-2"></i>فاتورة مبيعات جديدة</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form method="POST" action="{{ url_for('add_sale') }}">
+                        <div class="modal-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="invoice_number" class="form-label">رقم الفاتورة *</label>
+                                        <input type="text" class="form-control" id="invoice_number" name="invoice_number"
+                                               value="INV-{{ moment().format('YYYYMMDD') }}-{{ (sales|length + 1)|string.zfill(3) }}" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="customer_id" class="form-label">العميل</label>
+                                        <select class="form-select" id="customer_id" name="customer_id">
+                                            <option value="">عميل نقدي</option>
+                                            {% for customer in customers %}
+                                            <option value="{{ customer.id }}">{{ customer.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="subtotal" class="form-label">المبلغ الفرعي *</label>
+                                        <input type="number" step="0.01" class="form-control" id="subtotal" name="subtotal" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="tax_amount" class="form-label">الضريبة (15%)</label>
+                                        <input type="number" step="0.01" class="form-control" id="tax_amount" name="tax_amount" readonly>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="total" class="form-label">الإجمالي</label>
+                                        <input type="number" step="0.01" class="form-control" id="total" name="total" readonly>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="notes" class="form-label">ملاحظات</label>
+                                <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <i class="fas fa-times me-2"></i>إلغاء
+                            </button>
+                            <button type="submit" class="btn btn-info">
+                                <i class="fas fa-save me-2"></i>حفظ الفاتورة
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            // حساب الضريبة والإجمالي تلقائياً
+            document.getElementById('subtotal').addEventListener('input', function() {
+                const subtotal = parseFloat(this.value) || 0;
+                const taxAmount = subtotal * 0.15;
+                const total = subtotal + taxAmount;
+
+                document.getElementById('tax_amount').value = taxAmount.toFixed(2);
+                document.getElementById('total').value = total.toFixed(2);
+            });
+        </script>
+    </body>
+    </html>
+    ''', sales=sales, customers=customers, total_sales=total_sales)
+
+@app.route('/add_sale', methods=['POST'])
+@login_required
+def add_sale():
+    sale = SalesInvoice(
+        invoice_number=request.form['invoice_number'],
+        customer_id=request.form.get('customer_id') if request.form.get('customer_id') else None,
+        subtotal=float(request.form['subtotal']),
+        tax_amount=float(request.form.get('tax_amount', 0)),
+        total=float(request.form.get('total', 0)),
+        notes=request.form.get('notes'),
+        status='pending'
+    )
+    db.session.add(sale)
+    db.session.commit()
+    flash('تم إنشاء فاتورة المبيعات بنجاح', 'success')
+    return redirect(url_for('sales'))
 
 @app.route('/purchases')
 @login_required
