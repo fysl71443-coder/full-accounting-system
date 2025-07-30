@@ -1,21 +1,23 @@
-# Flask framework
-Flask==2.2.5
+# Flask framework - Python 3.13 compatible
+Flask==3.0.0
 
-# Database
-SQLAlchemy==2.0.16
+# Database - Latest compatible versions
+SQLAlchemy==2.0.23
 Flask-SQLAlchemy==3.1.1
 
 # Authentication
-Flask-Login==0.6.2
-Flask-WTF==1.0.1
-
-# Email support
-Flask-Mail==0.9.1
+Flask-Login==0.6.3
 
 # Deployment
-gunicorn==20.1.0
+gunicorn==21.2.0
 
 # Other utilities
-itsdangerous==2.2.0
-Jinja2==3.1.3
-Werkzeug==3.0.3
+itsdangerous==2.1.2
+Jinja2==3.1.2
+Werkzeug==3.0.1
+MarkupSafe==2.1.3
+click==8.1.7
+blinker==1.7.0
+
+# Optional
+python-dotenv==1.0.0

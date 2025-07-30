@@ -11,8 +11,29 @@ import sys
 # إضافة المسار الحالي
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# استيراد النظام الكامل المتوافق مع Python 3.13
-from accounting_system_complete import app
+try:
+    # استيراد النظام الكامل
+    from accounting_system_complete import app, init_db
+
+    # تهيئة قاعدة البيانات عند الاستيراد
+    with app.app_context():
+        init_db()
+
+    print("✅ تم تحميل النظام الكامل بنجاح")
+
+except ImportError as e:
+    print(f"❌ خطأ في الاستيراد: {e}")
+    # إنشاء تطبيق بسيط في حالة فشل الاستيراد
+    from flask import Flask
+    app = Flask(__name__)
+
+    @app.route('/')
+    def hello():
+        return '''
+        <h1 style="text-align: center; color: red;">خطأ في تحميل النظام</h1>
+        <p style="text-align: center;">يرجى التحقق من السجلات لمعرفة السبب</p>
+        <p style="text-align: center;">Error loading system. Please check logs.</p>
+        '''
 
 # للنشر على Render
 if __name__ == '__main__':
