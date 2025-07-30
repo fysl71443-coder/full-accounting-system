@@ -62,3 +62,11 @@ logs/
 # Cache
 .cache/
 .pytest_cache/
+
+# Old directories (ignore for deployment)
+app/
+templates/
+static/
+scripts/
+tests/
+instance/
