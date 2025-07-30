@@ -1414,20 +1414,837 @@ def add_sale():
 @app.route('/purchases')
 @login_required
 def purchases():
-    purchases = PurchaseInvoice.query.all()
-    return f"<h1>فواتير المشتريات</h1><p>عدد الفواتير: {len(purchases)}</p><a href='/dashboard'>العودة للوحة التحكم</a>"
+    purchases = PurchaseInvoice.query.order_by(PurchaseInvoice.created_at.desc()).all()
+    suppliers = Supplier.query.all()
+    total_purchases = sum(purchase.total for purchase in purchases)
+
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>فواتير المشتريات - نظام المحاسبة</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            body { background-color: #f8f9fa; }
+            .navbar { background: linear-gradient(45deg, #667eea, #764ba2) !important; }
+            .purchase-card { border-left: 4px solid #6f42c1; }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-calculator me-2"></i>نظام المحاسبة
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="{{ url_for('dashboard') }}">
+                        <i class="fas fa-home me-1"></i>الرئيسية
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <!-- إحصائيات المشتريات -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card bg-secondary text-white purchase-card">
+                        <div class="card-body text-center">
+                            <i class="fas fa-shopping-cart fa-2x mb-2"></i>
+                            <h4>{{ purchases|length }}</h4>
+                            <p class="mb-0">إجمالي فواتير المشتريات</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body text-center">
+                            <i class="fas fa-money-bill-wave fa-2x mb-2"></i>
+                            <h4>{{ "%.2f"|format(total_purchases) }} ر.س</h4>
+                            <p class="mb-0">إجمالي قيمة المشتريات</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-dark text-white">
+                        <div class="card-body text-center">
+                            <i class="fas fa-truck fa-2x mb-2"></i>
+                            <h4>{{ suppliers|length }}</h4>
+                            <p class="mb-0">الموردين المسجلين</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow">
+                <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-shopping-cart me-2"></i>فواتير المشتريات</h5>
+                    <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#addPurchaseModal">
+                        <i class="fas fa-plus me-2"></i>فاتورة مشتريات جديدة
+                    </button>
+                </div>
+                <div class="card-body">
+                    {% if purchases %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>رقم الفاتورة</th>
+                                    <th>المورد</th>
+                                    <th>التاريخ</th>
+                                    <th>المبلغ الفرعي</th>
+                                    <th>الضريبة</th>
+                                    <th>الإجمالي</th>
+                                    <th>الحالة</th>
+                                    <th>الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for purchase in purchases %}
+                                <tr>
+                                    <td><strong>{{ purchase.invoice_number }}</strong></td>
+                                    <td>{{ purchase.supplier.name if purchase.supplier else 'مورد غير محدد' }}</td>
+                                    <td>{{ purchase.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>{{ "%.2f"|format(purchase.subtotal) }} ر.س</td>
+                                    <td>{{ "%.2f"|format(purchase.tax_amount) }} ر.س</td>
+                                    <td><strong>{{ "%.2f"|format(purchase.total) }} ر.س</strong></td>
+                                    <td>
+                                        <span class="badge
+                                        {% if purchase.status == 'paid' %}bg-success
+                                        {% elif purchase.status == 'pending' %}bg-warning
+                                        {% else %}bg-danger{% endif %}">
+                                        {% if purchase.status == 'paid' %}مدفوعة
+                                        {% elif purchase.status == 'pending' %}معلقة
+                                        {% else %}ملغية{% endif %}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" title="عرض">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-success" title="طباعة">
+                                            <i class="fas fa-print"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-warning" title="تعديل">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-shopping-cart fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">لا توجد فواتير مشتريات</h5>
+                        <p class="text-muted">ابدأ بإنشاء فاتورة مشتريات جديدة</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal إضافة فاتورة مشتريات -->
+        <div class="modal fade" id="addPurchaseModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-secondary text-white">
+                        <h5 class="modal-title"><i class="fas fa-plus me-2"></i>فاتورة مشتريات جديدة</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form method="POST" action="{{ url_for('add_purchase') }}">
+                        <div class="modal-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="invoice_number" class="form-label">رقم الفاتورة *</label>
+                                        <input type="text" class="form-control" id="invoice_number" name="invoice_number"
+                                               value="PUR-{{ moment().format('YYYYMMDD') }}-{{ (purchases|length + 1)|string.zfill(3) }}" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="supplier_id" class="form-label">المورد *</label>
+                                        <select class="form-select" id="supplier_id" name="supplier_id" required>
+                                            <option value="">اختر المورد</option>
+                                            {% for supplier in suppliers %}
+                                            <option value="{{ supplier.id }}">{{ supplier.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="subtotal" class="form-label">المبلغ الفرعي *</label>
+                                        <input type="number" step="0.01" class="form-control" id="subtotal" name="subtotal" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="tax_amount" class="form-label">الضريبة (15%)</label>
+                                        <input type="number" step="0.01" class="form-control" id="tax_amount" name="tax_amount" readonly>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="total" class="form-label">الإجمالي</label>
+                                        <input type="number" step="0.01" class="form-control" id="total" name="total" readonly>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="notes" class="form-label">ملاحظات</label>
+                                <textarea class="form-control" id="notes" name="notes" rows="2" placeholder="أي ملاحظات إضافية..."></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">
+                                <i class="fas fa-times me-2"></i>إلغاء
+                            </button>
+                            <button type="submit" class="btn btn-secondary">
+                                <i class="fas fa-save me-2"></i>حفظ فاتورة المشتريات
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            // حساب الضريبة والإجمالي تلقائياً
+            document.getElementById('subtotal').addEventListener('input', function() {
+                const subtotal = parseFloat(this.value) || 0;
+                const taxAmount = subtotal * 0.15;
+                const total = subtotal + taxAmount;
+
+                document.getElementById('tax_amount').value = taxAmount.toFixed(2);
+                document.getElementById('total').value = total.toFixed(2);
+            });
+        </script>
+    </body>
+    </html>
+    ''', purchases=purchases, suppliers=suppliers, total_purchases=total_purchases)
+
+@app.route('/add_purchase', methods=['POST'])
+@login_required
+def add_purchase():
+    purchase = PurchaseInvoice(
+        invoice_number=request.form['invoice_number'],
+        supplier_id=int(request.form['supplier_id']),
+        subtotal=float(request.form['subtotal']),
+        tax_amount=float(request.form.get('tax_amount', 0)),
+        total=float(request.form.get('total', 0)),
+        notes=request.form.get('notes'),
+        status='pending'
+    )
+    db.session.add(purchase)
+    db.session.commit()
+    flash('تم إنشاء فاتورة المشتريات بنجاح', 'success')
+    return redirect(url_for('purchases'))
 
 @app.route('/expenses')
 @login_required
 def expenses():
-    expenses = Expense.query.all()
-    return f"<h1>إدارة المصروفات</h1><p>عدد المصروفات: {len(expenses)}</p><a href='/dashboard'>العودة للوحة التحكم</a>"
+    expenses = Expense.query.order_by(Expense.created_at.desc()).all()
+    total_expenses = sum(expense.amount for expense in expenses)
+
+    # تجميع المصروفات حسب الفئة
+    from sqlalchemy import func
+    expense_categories = db.session.query(
+        Expense.category,
+        func.sum(Expense.amount).label('total'),
+        func.count(Expense.id).label('count')
+    ).group_by(Expense.category).all()
+
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>إدارة المصروفات - نظام المحاسبة</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            body { background-color: #f8f9fa; }
+            .navbar { background: linear-gradient(45deg, #667eea, #764ba2) !important; }
+            .expense-card { border-left: 4px solid #dc3545; }
+            .category-badge {
+                font-size: 0.8em;
+                padding: 0.25em 0.5em;
+            }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-calculator me-2"></i>نظام المحاسبة
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="{{ url_for('dashboard') }}">
+                        <i class="fas fa-home me-1"></i>الرئيسية
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <!-- إحصائيات المصروفات -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white expense-card">
+                        <div class="card-body text-center">
+                            <i class="fas fa-receipt fa-2x mb-2"></i>
+                            <h4>{{ expenses|length }}</h4>
+                            <p class="mb-0">إجمالي المصروفات</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-dark">
+                        <div class="card-body text-center">
+                            <i class="fas fa-money-bill-wave fa-2x mb-2"></i>
+                            <h4>{{ "%.2f"|format(total_expenses) }} ر.س</h4>
+                            <p class="mb-0">إجمالي القيمة</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body text-center">
+                            <i class="fas fa-tags fa-2x mb-2"></i>
+                            <h4>{{ expense_categories|length }}</h4>
+                            <p class="mb-0">فئات المصروفات</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <i class="fas fa-calendar-day fa-2x mb-2"></i>
+                            <h4>{{ "%.2f"|format(total_expenses / (expenses|length) if expenses|length > 0 else 0) }}</h4>
+                            <p class="mb-0">متوسط المصروف</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- تحليل الفئات -->
+            {% if expense_categories %}
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0"><i class="fas fa-chart-pie me-2"></i>تحليل المصروفات حسب الفئة</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for category in expense_categories %}
+                        <div class="col-md-4 mb-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge bg-secondary category-badge">{{ category.category }}</span>
+                                <span><strong>{{ "%.2f"|format(category.total) }} ر.س</strong> ({{ category.count }} مصروف)</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="card shadow">
+                <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-receipt me-2"></i>إدارة المصروفات</h5>
+                    <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#addExpenseModal">
+                        <i class="fas fa-plus me-2"></i>إضافة مصروف جديد
+                    </button>
+                </div>
+                <div class="card-body">
+                    {% if expenses %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>التاريخ</th>
+                                    <th>الوصف</th>
+                                    <th>الفئة</th>
+                                    <th>المبلغ</th>
+                                    <th>طريقة الدفع</th>
+                                    <th>رقم الإيصال</th>
+                                    <th>الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for expense in expenses %}
+                                <tr>
+                                    <td>{{ expense.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        <strong>{{ expense.description }}</strong>
+                                        {% if expense.notes %}
+                                        <br><small class="text-muted">{{ expense.notes[:50] }}...</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary category-badge">{{ expense.category }}</span>
+                                    </td>
+                                    <td><strong class="text-danger">{{ "%.2f"|format(expense.amount) }} ر.س</strong></td>
+                                    <td>
+                                        {% if expense.payment_method == 'cash' %}
+                                        <i class="fas fa-money-bill text-success"></i> نقدي
+                                        {% elif expense.payment_method == 'card' %}
+                                        <i class="fas fa-credit-card text-primary"></i> بطاقة
+                                        {% elif expense.payment_method == 'bank' %}
+                                        <i class="fas fa-university text-info"></i> بنكي
+                                        {% else %}
+                                        <i class="fas fa-question text-muted"></i> أخرى
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ expense.receipt_number or '-' }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" title="عرض">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-warning" title="تعديل">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" title="حذف">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">لا توجد مصروفات مسجلة</h5>
+                        <p class="text-muted">ابدأ بإضافة مصروف جديد</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal إضافة مصروف -->
+        <div class="modal fade" id="addExpenseModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title"><i class="fas fa-plus me-2"></i>إضافة مصروف جديد</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form method="POST" action="{{ url_for('add_expense') }}">
+                        <div class="modal-body">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="mb-3">
+                                        <label for="description" class="form-label">وصف المصروف *</label>
+                                        <input type="text" class="form-control" id="description" name="description" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="amount" class="form-label">المبلغ *</label>
+                                        <input type="number" step="0.01" class="form-control" id="amount" name="amount" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="category" class="form-label">الفئة *</label>
+                                        <select class="form-select" id="category" name="category" required>
+                                            <option value="">اختر الفئة</option>
+                                            <option value="مكتب">مصروفات مكتبية</option>
+                                            <option value="سفر">سفر وانتقالات</option>
+                                            <option value="اتصالات">اتصالات وإنترنت</option>
+                                            <option value="كهرباء">كهرباء ومياه</option>
+                                            <option value="إيجار">إيجار</option>
+                                            <option value="صيانة">صيانة وإصلاح</option>
+                                            <option value="تسويق">تسويق وإعلان</option>
+                                            <option value="أخرى">أخرى</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="payment_method" class="form-label">طريقة الدفع</label>
+                                        <select class="form-select" id="payment_method" name="payment_method">
+                                            <option value="cash">نقدي</option>
+                                            <option value="card">بطاقة ائتمان</option>
+                                            <option value="bank">تحويل بنكي</option>
+                                            <option value="check">شيك</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="receipt_number" class="form-label">رقم الإيصال</label>
+                                        <input type="text" class="form-control" id="receipt_number" name="receipt_number">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="date" class="form-label">التاريخ</label>
+                                        <input type="date" class="form-control" id="date" name="date" value="{{ moment().format('YYYY-MM-DD') }}">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="notes" class="form-label">ملاحظات</label>
+                                <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <i class="fas fa-times me-2"></i>إلغاء
+                            </button>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-save me-2"></i>حفظ المصروف
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    </body>
+    </html>
+    ''', expenses=expenses, total_expenses=total_expenses, expense_categories=expense_categories)
+
+@app.route('/add_expense', methods=['POST'])
+@login_required
+def add_expense():
+    from datetime import datetime
+    expense_date = datetime.strptime(request.form.get('date', date.today().strftime('%Y-%m-%d')), '%Y-%m-%d').date()
+
+    expense = Expense(
+        description=request.form['description'],
+        amount=float(request.form['amount']),
+        category=request.form['category'],
+        payment_method=request.form.get('payment_method', 'cash'),
+        receipt_number=request.form.get('receipt_number'),
+        date=expense_date,
+        notes=request.form.get('notes')
+    )
+    db.session.add(expense)
+    db.session.commit()
+    flash('تم إضافة المصروف بنجاح', 'success')
+    return redirect(url_for('expenses'))
 
 @app.route('/employees')
 @login_required
 def employees():
-    employees = Employee.query.all()
-    return f"<h1>إدارة الموظفين</h1><p>عدد الموظفين: {len(employees)}</p><a href='/dashboard'>العودة للوحة التحكم</a>"
+    employees = Employee.query.order_by(Employee.created_at.desc()).all()
+    active_employees = Employee.query.filter_by(status='active').count()
+    total_salaries = sum(emp.salary for emp in employees if emp.status == 'active')
+
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>إدارة الموظفين والرواتب - نظام المحاسبة</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            body { background-color: #f8f9fa; }
+            .navbar { background: linear-gradient(45deg, #667eea, #764ba2) !important; }
+            .employee-card { border-left: 4px solid #198754; }
+            .status-active { color: #198754; }
+            .status-inactive { color: #dc3545; }
+            .salary-highlight { background-color: #e8f5e8; font-weight: bold; }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-calculator me-2"></i>نظام المحاسبة
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="{{ url_for('dashboard') }}">
+                        <i class="fas fa-home me-1"></i>الرئيسية
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <!-- إحصائيات الموظفين -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white employee-card">
+                        <div class="card-body text-center">
+                            <i class="fas fa-user-tie fa-2x mb-2"></i>
+                            <h4>{{ employees|length }}</h4>
+                            <p class="mb-0">إجمالي الموظفين</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <i class="fas fa-user-check fa-2x mb-2"></i>
+                            <h4>{{ active_employees }}</h4>
+                            <p class="mb-0">الموظفين النشطين</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-dark">
+                        <div class="card-body text-center">
+                            <i class="fas fa-money-check-alt fa-2x mb-2"></i>
+                            <h4>{{ "%.0f"|format(total_salaries) }} ر.س</h4>
+                            <p class="mb-0">إجمالي الرواتب الشهرية</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body text-center">
+                            <i class="fas fa-calculator fa-2x mb-2"></i>
+                            <h4>{{ "%.0f"|format(total_salaries / active_employees if active_employees > 0 else 0) }}</h4>
+                            <p class="mb-0">متوسط الراتب</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-user-tie me-2"></i>إدارة الموظفين والرواتب</h5>
+                    <div>
+                        <button type="button" class="btn btn-light me-2" data-bs-toggle="modal" data-bs-target="#payrollModal">
+                            <i class="fas fa-money-check-alt me-2"></i>كشف الرواتب
+                        </button>
+                        <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#addEmployeeModal">
+                            <i class="fas fa-plus me-2"></i>إضافة موظف جديد
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if employees %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>الاسم</th>
+                                    <th>المنصب</th>
+                                    <th>الراتب الشهري</th>
+                                    <th>الهاتف</th>
+                                    <th>البريد الإلكتروني</th>
+                                    <th>تاريخ التوظيف</th>
+                                    <th>الحالة</th>
+                                    <th>الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for employee in employees %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-circle bg-primary text-white me-2" style="width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                                                {{ employee.name[0].upper() }}
+                                            </div>
+                                            <strong>{{ employee.name }}</strong>
+                                        </div>
+                                    </td>
+                                    <td>{{ employee.position }}</td>
+                                    <td class="salary-highlight">{{ "%.2f"|format(employee.salary) }} ر.س</td>
+                                    <td>{{ employee.phone or '-' }}</td>
+                                    <td>{{ employee.email or '-' }}</td>
+                                    <td>{{ employee.hire_date.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        {% if employee.status == 'active' %}
+                                        <span class="badge bg-success">نشط</span>
+                                        {% else %}
+                                        <span class="badge bg-danger">غير نشط</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-info" title="عرض الملف">
+                                            <i class="fas fa-user"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-success" title="كشف راتب">
+                                            <i class="fas fa-money-check"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-warning" title="تعديل">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" title="حذف">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-user-tie fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">لا يوجد موظفين مسجلين</h5>
+                        <p class="text-muted">ابدأ بإضافة موظف جديد</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal إضافة موظف -->
+        <div class="modal fade" id="addEmployeeModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title"><i class="fas fa-plus me-2"></i>إضافة موظف جديد</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form method="POST" action="{{ url_for('add_employee') }}">
+                        <div class="modal-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="name" class="form-label">اسم الموظف *</label>
+                                        <input type="text" class="form-control" id="name" name="name" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="position" class="form-label">المنصب *</label>
+                                        <input type="text" class="form-control" id="position" name="position" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="salary" class="form-label">الراتب الشهري *</label>
+                                        <input type="number" step="0.01" class="form-control" id="salary" name="salary" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="hire_date" class="form-label">تاريخ التوظيف *</label>
+                                        <input type="date" class="form-control" id="hire_date" name="hire_date" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="phone" class="form-label">رقم الهاتف</label>
+                                        <input type="text" class="form-control" id="phone" name="phone">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="email" class="form-label">البريد الإلكتروني</label>
+                                        <input type="email" class="form-control" id="email" name="email">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <i class="fas fa-times me-2"></i>إلغاء
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>حفظ الموظف
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal كشف الرواتب -->
+        <div class="modal fade" id="payrollModal" tabindex="-1">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title"><i class="fas fa-money-check-alt me-2"></i>كشف الرواتب الشهري</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead class="table-success">
+                                    <tr>
+                                        <th>الموظف</th>
+                                        <th>المنصب</th>
+                                        <th>الراتب الأساسي</th>
+                                        <th>البدلات</th>
+                                        <th>الخصومات</th>
+                                        <th>صافي الراتب</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for employee in employees %}
+                                    {% if employee.status == 'active' %}
+                                    <tr>
+                                        <td><strong>{{ employee.name }}</strong></td>
+                                        <td>{{ employee.position }}</td>
+                                        <td>{{ "%.2f"|format(employee.salary) }} ر.س</td>
+                                        <td>0.00 ر.س</td>
+                                        <td>0.00 ر.س</td>
+                                        <td class="salary-highlight">{{ "%.2f"|format(employee.salary) }} ر.س</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot class="table-dark">
+                                    <tr>
+                                        <th colspan="5">الإجمالي</th>
+                                        <th>{{ "%.2f"|format(total_salaries) }} ر.س</th>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-success">
+                            <i class="fas fa-print me-2"></i>طباعة كشف الرواتب
+                        </button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    </body>
+    </html>
+    ''', employees=employees, active_employees=active_employees, total_salaries=total_salaries)
+
+@app.route('/add_employee', methods=['POST'])
+@login_required
+def add_employee():
+    from datetime import datetime
+    hire_date = datetime.strptime(request.form['hire_date'], '%Y-%m-%d').date()
+
+    employee = Employee(
+        name=request.form['name'],
+        position=request.form['position'],
+        salary=float(request.form['salary']),
+        hire_date=hire_date,
+        phone=request.form.get('phone'),
+        email=request.form.get('email'),
+        status='active'
+    )
+    db.session.add(employee)
+    db.session.commit()
+    flash('تم إضافة الموظف بنجاح', 'success')
+    return redirect(url_for('employees'))
 
 @app.route('/reports')
 @login_required
