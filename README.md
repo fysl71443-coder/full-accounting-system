@@ -118,8 +118,8 @@
 ### 1️⃣ تحضير البيئة
 ```bash
 # استنساخ المشروع
-git clone [repository-url]
-cd accounting-system
+git clone https://github.com/fysl71443-coder/full-accounting-system.git
+cd full-accounting-system
 
 # إنشاء بيئة افتراضية
 python -m venv .venv

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-نظام المحاسبة الاحترافي الكامل - متوافق مع Python 3.13
-Complete Professional Accounting System - Python 3.13 Compatible
+نظام المحاسبة الاحترافي الكامل - متوافق مع Python 3.10
+Complete Professional Accounting System - Python 3.10 Compatible
 """
 
 import os
@@ -38,10 +38,10 @@ class User(UserMixin, db.Model):
     full_name = db.Column(db.String(100), nullable=False)
     role = db.Column(db.String(20), default='user')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
-    
+
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
@@ -106,6 +106,68 @@ class Expense(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     description = db.Column(db.String(200), nullable=False)
     amount = db.Column(db.Numeric(10, 2), nullable=False)
+    category = db.Column(db.String(50), nullable=False)
+    date = db.Column(db.Date, nullable=False, default=date.today)
+    payment_method = db.Column(db.String(20), default='cash')
+    receipt_number = db.Column(db.String(50))
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+from datetime import datetime, date
+from decimal import Decimal
+from flask import Flask, render_template_string, request, redirect, url_for, flash, jsonify, session
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+
+# إنشاء التطبيق
+app = Flask(__name__)
+
+# الإعدادات
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'accounting-system-complete-2024')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///accounting_complete.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# قاعدة البيانات
+db = SQLAlchemy(app)
+
+# نظام تسجيل الدخول
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+# ===== نماذج قاعدة البيانات =====
+
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(120), nullable=False)
+    full_name = db.Column(db.String(100), nullable=False)
+    role = db.Column(db.String(20), default='user')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+class Customer(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(100))
+    phone = db.Column(db.String(20))
+    address = db.Column(db.Text)
+    tax_number = db.Column(db.String(50))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Supplier(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(100))
+    phone = db.Column(db.String(20))
+    address = db.Column(db.Text)
+    tax_number = db.Column(db.String(50))
+    created_at = db.Column(db.DateTime, default=datetb.Numeric(10, 2), nullable=False)
     category = db.Column(db.String(50), nullable=False)
     date = db.Column(db.Date, nullable=False, default=date.today)
     payment_method = db.Column(db.String(20), default='cash')

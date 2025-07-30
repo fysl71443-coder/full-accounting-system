@@ -1,13 +1,15 @@
 services:
   - type: web
-    name: complete-accounting-system
+    name: full-accounting-system
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn accounting_system_complete:app
+    startCommand: gunicorn app:app
     envVars:
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
         value: sqlite:///accounting_complete.db
+      - key: PYTHON_VERSION
+        value: 3.10.12
 
