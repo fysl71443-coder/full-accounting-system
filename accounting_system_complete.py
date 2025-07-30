@@ -167,12 +167,6 @@ class Supplier(db.Model):
     phone = db.Column(db.String(20))
     address = db.Column(db.Text)
     tax_number = db.Column(db.String(50))
-    created_at = db.Column(db.DateTime, default=datetb.Numeric(10, 2), nullable=False)
-    category = db.Column(db.String(50), nullable=False)
-    date = db.Column(db.Date, nullable=False, default=date.today)
-    payment_method = db.Column(db.String(20), default='cash')
-    receipt_number = db.Column(db.String(50))
-    notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Employee(db.Model):
