@@ -621,6 +621,18 @@ def dashboard():
                         </div>
                     </a>
                 </div>
+
+                {% if current_user.role == 'admin' %}
+                <div class="col-md-4">
+                    <a href="{{ url_for('users') }}" class="function-card d-block">
+                        <div class="text-center">
+                            <i class="fas fa-users-cog fa-2x text-danger mb-3"></i>
+                            <h5>إدارة المستخدمين</h5>
+                            <p class="text-muted">إدارة المستخدمين والصلاحيات</p>
+                        </div>
+                    </a>
+                </div>
+                {% endif %}
             </div>
 
             <!-- تنبيهات المخزون -->
@@ -2490,13 +2502,13 @@ def reports():
                             <h6 class="mb-0"><i class="fas fa-file-export me-2"></i>تصدير التقارير</h6>
                         </div>
                         <div class="card-body text-center">
-                            <button class="btn btn-success me-2" onclick="printReport()">
+                            <button class="btn btn-success me-2" onclick="window.print()">
                                 <i class="fas fa-print me-2"></i>طباعة التقرير
                             </button>
-                            <button class="btn btn-primary me-2" onclick="exportPDF()">
+                            <button class="btn btn-primary me-2" onclick="exportToPDF()">
                                 <i class="fas fa-file-pdf me-2"></i>تصدير PDF
                             </button>
-                            <button class="btn btn-info" onclick="exportExcel()">
+                            <button class="btn btn-info" onclick="exportToExcel()">
                                 <i class="fas fa-file-excel me-2"></i>تصدير Excel
                             </button>
                         </div>
@@ -2506,6 +2518,9 @@ def reports():
         </div>
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+        <script src="/static/js/accounting-system.js"></script>
         <script>
             // رسم بياني للمبيعات والمشتريات
             const salesPurchasesCtx = document.getElementById('salesPurchasesChart').getContext('2d');
@@ -2954,7 +2969,396 @@ def api_statistics():
         'timestamp': datetime.utcnow().isoformat()
     })
 
-# ===== نظام الإعدادات =====
+# ===== نظام إدارة المستخدمين =====
+
+@app.route('/users')
+@login_required
+def users():
+    if current_user.role != 'admin':
+        flash('ليس لديك صلاحية للوصول لهذه الصفحة', 'error')
+        return redirect(url_for('dashboard'))
+
+    users = User.query.all()
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>إدارة المستخدمين - نظام المحاسبة</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            body { background-color: #f8f9fa; }
+            .navbar { background: linear-gradient(45deg, #667eea, #764ba2) !important; }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-calculator me-2"></i>نظام المحاسبة
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="javascript:history.back()">
+                        <i class="fas fa-arrow-right me-1"></i>رجوع
+                    </a>
+                    <a class="nav-link" href="{{ url_for('dashboard') }}">
+                        <i class="fas fa-home me-1"></i>الرئيسية
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-users-cog me-2"></i>إدارة المستخدمين</h5>
+                    <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                        <i class="fas fa-plus me-2"></i>إضافة مستخدم جديد
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>اسم المستخدم</th>
+                                    <th>الاسم الكامل</th>
+                                    <th>الدور</th>
+                                    <th>تاريخ الإنشاء</th>
+                                    <th>الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users %}
+                                <tr>
+                                    <td><strong>{{ user.username }}</strong></td>
+                                    <td>{{ user.full_name }}</td>
+                                    <td>
+                                        <span class="badge {{ 'bg-danger' if user.role == 'admin' else 'bg-primary' }}">
+                                            {{ 'مدير' if user.role == 'admin' else 'مستخدم' }}
+                                        </span>
+                                    </td>
+                                    <td>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else '-' }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-warning" onclick="editUser({{ user.id }})">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        {% if user.id != current_user.id %}
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteUser({{ user.id }}, '{{ user.username }}')">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        {% endif %}
+                                        <button class="btn btn-sm btn-outline-info" onclick="resetPassword({{ user.id }})">
+                                            <i class="fas fa-key"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal إضافة مستخدم -->
+        <div class="modal fade" id="addUserModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title">إضافة مستخدم جديد</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form method="POST" action="{{ url_for('add_user') }}">
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="username" class="form-label">اسم المستخدم *</label>
+                                <input type="text" class="form-control" id="username" name="username" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="full_name" class="form-label">الاسم الكامل *</label>
+                                <input type="text" class="form-control" id="full_name" name="full_name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="password" class="form-label">كلمة المرور *</label>
+                                <input type="password" class="form-control" id="password" name="password" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="role" class="form-label">الدور</label>
+                                <select class="form-select" id="role" name="role">
+                                    <option value="user">مستخدم</option>
+                                    <option value="admin">مدير</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                            <button type="submit" class="btn btn-primary">حفظ المستخدم</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            function editUser(id) {
+                // تحميل بيانات المستخدم وفتح نموذج التحرير
+                alert('سيتم تطوير تحرير المستخدم قريباً');
+            }
+
+            function deleteUser(id, username) {
+                if (confirm('هل أنت متأكد من حذف المستخدم: ' + username + '؟')) {
+                    fetch('/delete_user/' + id, {
+                        method: 'DELETE'
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('تم حذف المستخدم بنجاح');
+                            location.reload();
+                        } else {
+                            alert('حدث خطأ أثناء الحذف');
+                        }
+                    });
+                }
+            }
+
+            function resetPassword(id) {
+                const newPassword = prompt('أدخل كلمة المرور الجديدة:');
+                if (newPassword) {
+                    fetch('/reset_password/' + id, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({password: newPassword})
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('تم تغيير كلمة المرور بنجاح');
+                        } else {
+                            alert('حدث خطأ أثناء تغيير كلمة المرور');
+                        }
+                    });
+                }
+            }
+        </script>
+    </body>
+    </html>
+    ''', users=users)
+
+@app.route('/add_user', methods=['POST'])
+@login_required
+def add_user():
+    if current_user.role != 'admin':
+        flash('ليس لديك صلاحية لإضافة مستخدمين', 'error')
+        return redirect(url_for('dashboard'))
+
+    # التحقق من عدم وجود اسم المستخدم
+    existing_user = User.query.filter_by(username=request.form['username']).first()
+    if existing_user:
+        flash('اسم المستخدم موجود بالفعل', 'error')
+        return redirect(url_for('users'))
+
+    user = User(
+        username=request.form['username'],
+        full_name=request.form['full_name'],
+        role=request.form.get('role', 'user')
+    )
+    user.set_password(request.form['password'])
+
+    db.session.add(user)
+    db.session.commit()
+    flash('تم إضافة المستخدم بنجاح', 'success')
+    return redirect(url_for('users'))
+
+@app.route('/delete_user/<int:user_id>', methods=['DELETE'])
+@login_required
+def delete_user(user_id):
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': 'ليس لديك صلاحية'})
+
+    if user_id == current_user.id:
+        return jsonify({'success': False, 'message': 'لا يمكن حذف نفسك'})
+
+    user = User.query.get_or_404(user_id)
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/reset_password/<int:user_id>', methods=['POST'])
+@login_required
+def reset_password(user_id):
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': 'ليس لديك صلاحية'})
+
+    user = User.query.get_or_404(user_id)
+    new_password = request.json.get('password')
+
+    if new_password:
+        user.set_password(new_password)
+        db.session.commit()
+        return jsonify({'success': True})
+
+    return jsonify({'success': False, 'message': 'كلمة المرور مطلوبة'})
+
+# ===== وظائف الحذف والتحرير =====
+
+@app.route('/delete_customer/<int:customer_id>', methods=['DELETE'])
+@login_required
+def delete_customer(customer_id):
+    customer = Customer.query.get_or_404(customer_id)
+    db.session.delete(customer)
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/delete_supplier/<int:supplier_id>', methods=['DELETE'])
+@login_required
+def delete_supplier(supplier_id):
+    supplier = Supplier.query.get_or_404(supplier_id)
+    db.session.delete(supplier)
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/delete_product/<int:product_id>', methods=['DELETE'])
+@login_required
+def delete_product(product_id):
+    product = Product.query.get_or_404(product_id)
+    db.session.delete(product)
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/delete_employee/<int:employee_id>', methods=['DELETE'])
+@login_required
+def delete_employee(employee_id):
+    employee = Employee.query.get_or_404(employee_id)
+    db.session.delete(employee)
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/delete_expense/<int:expense_id>', methods=['DELETE'])
+@login_required
+def delete_expense(expense_id):
+    expense = Expense.query.get_or_404(expense_id)
+    db.session.delete(expense)
+    db.session.commit()
+    return jsonify({'success': True})
+
+# ===== وظائف الطباعة والتصدير =====
+
+@app.route('/print_invoice/<int:invoice_id>')
+@login_required
+def print_invoice(invoice_id):
+    invoice = SalesInvoice.query.get_or_404(invoice_id)
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>فاتورة رقم {{ invoice.invoice_number }}</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; }
+            .invoice-details { margin: 20px 0; }
+            .total { font-size: 18px; font-weight: bold; }
+            @media print {
+                .no-print { display: none; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>فاتورة مبيعات</h1>
+            <h2>رقم الفاتورة: {{ invoice.invoice_number }}</h2>
+        </div>
+
+        <div class="invoice-details">
+            <p><strong>العميل:</strong> {{ invoice.customer.name if invoice.customer else 'عميل نقدي' }}</p>
+            <p><strong>التاريخ:</strong> {{ invoice.date.strftime('%Y-%m-%d') }}</p>
+            <p><strong>المبلغ الفرعي:</strong> {{ "%.2f"|format(invoice.subtotal) }} ر.س</p>
+            <p><strong>الضريبة:</strong> {{ "%.2f"|format(invoice.tax_amount) }} ر.س</p>
+            <p class="total"><strong>الإجمالي:</strong> {{ "%.2f"|format(invoice.total) }} ر.س</p>
+            {% if invoice.notes %}
+            <p><strong>ملاحظات:</strong> {{ invoice.notes }}</p>
+            {% endif %}
+        </div>
+
+        <div class="no-print">
+            <button onclick="window.print()" class="btn btn-primary">طباعة</button>
+            <button onclick="window.close()" class="btn btn-secondary">إغلاق</button>
+        </div>
+
+        <script>
+            window.onload = function() {
+                window.print();
+            }
+        </script>
+    </body>
+    </html>
+    ''', invoice=invoice)
+
+@app.route('/export_pdf/<report_type>')
+@login_required
+def export_pdf(report_type):
+    # هذه وظيفة أساسية للتصدير - يمكن تطويرها لاحقاً
+    flash('سيتم تطوير تصدير PDF قريباً', 'info')
+    return redirect(request.referrer or url_for('dashboard'))
+
+@app.route('/export_excel/<report_type>')
+@login_required
+def export_excel(report_type):
+    # هذه وظيفة أساسية للتصدير - يمكن تطويرها لاحقاً
+    flash('سيتم تطوير تصدير Excel قريباً', 'info')
+    return redirect(request.referrer or url_for('dashboard'))
+
+# ===== تحديث الملف الشخصي =====
+
+@app.route('/update_profile', methods=['POST'])
+@login_required
+def update_profile():
+    current_user.full_name = request.form['full_name']
+
+    # التحقق من عدم وجود اسم المستخدم الجديد
+    new_username = request.form['username']
+    if new_username != current_user.username:
+        existing_user = User.query.filter_by(username=new_username).first()
+        if existing_user:
+            flash('اسم المستخدم موجود بالفعل', 'error')
+            return redirect(url_for('settings'))
+        current_user.username = new_username
+
+    db.session.commit()
+    flash('تم تحديث الملف الشخصي بنجاح', 'success')
+    return redirect(url_for('settings'))
+
+@app.route('/change_password', methods=['POST'])
+@login_required
+def change_password():
+    current_password = request.form['current_password']
+    new_password = request.form['new_password']
+    confirm_password = request.form['confirm_password']
+
+    if not current_user.check_password(current_password):
+        flash('كلمة المرور الحالية غير صحيحة', 'error')
+        return redirect(url_for('settings'))
+
+    if new_password != confirm_password:
+        flash('كلمة المرور الجديدة غير متطابقة', 'error')
+        return redirect(url_for('settings'))
+
+    if len(new_password) < 6:
+        flash('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error')
+        return redirect(url_for('settings'))
+
+    current_user.set_password(new_password)
+    db.session.commit()
+    flash('تم تغيير كلمة المرور بنجاح', 'success')
+    return redirect(url_for('settings'))
+
+# ===== نظام الإعدادات المحسن =====
 
 @app.route('/settings')
 @login_required
@@ -3234,13 +3638,58 @@ def settings():
             </div>
         </div>
 
+        <!-- Modal تغيير كلمة المرور -->
+        <div class="modal fade" id="changePasswordModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-warning text-dark">
+                        <h5 class="modal-title">تغيير كلمة المرور</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form method="POST" action="{{ url_for('change_password') }}">
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="current_password" class="form-label">كلمة المرور الحالية *</label>
+                                <input type="password" class="form-control" id="current_password" name="current_password" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="new_password" class="form-label">كلمة المرور الجديدة *</label>
+                                <input type="password" class="form-control" id="new_password" name="new_password" required minlength="6">
+                            </div>
+                            <div class="mb-3">
+                                <label for="confirm_password" class="form-label">تأكيد كلمة المرور *</label>
+                                <input type="password" class="form-control" id="confirm_password" name="confirm_password" required minlength="6">
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                            <button type="submit" class="btn btn-warning">تغيير كلمة المرور</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="/static/js/accounting-system.js"></script>
         <script>
             function confirmReset() {
                 if (confirm('هل أنت متأكد من إعادة تعيين النظام؟ سيتم حذف جميع البيانات!')) {
                     alert('تم إلغاء العملية للحماية');
                 }
             }
+
+            // التحقق من تطابق كلمة المرور
+            document.getElementById('confirm_password').addEventListener('input', function() {
+                const newPassword = document.getElementById('new_password').value;
+                const confirmPassword = this.value;
+
+                if (newPassword !== confirmPassword) {
+                    this.setCustomValidity('كلمة المرور غير متطابقة');
+                } else {
+                    this.setCustomValidity('');
+                }
+            });
         </script>
     </body>
     </html>
