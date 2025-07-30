@@ -611,6 +611,16 @@ def dashboard():
                         </div>
                     </a>
                 </div>
+
+                <div class="col-md-4">
+                    <a href="{{ url_for('settings') }}" class="function-card d-block">
+                        <div class="text-center">
+                            <i class="fas fa-cogs fa-2x text-secondary mb-3"></i>
+                            <h5>إعدادات النظام</h5>
+                            <p class="text-muted">إدارة وتخصيص النظام</p>
+                        </div>
+                    </a>
+                </div>
             </div>
 
             <!-- تنبيهات المخزون -->
@@ -2249,17 +2259,992 @@ def add_employee():
 @app.route('/reports')
 @login_required
 def reports():
-    return "<h1>التقارير المالية</h1><p>تقارير شاملة ومفصلة</p><a href='/dashboard'>العودة للوحة التحكم</a>"
+    from sqlalchemy import func, extract
+    from datetime import datetime, timedelta
+
+    # إحصائيات عامة
+    total_sales = db.session.query(func.sum(SalesInvoice.total)).scalar() or 0
+    total_purchases = db.session.query(func.sum(PurchaseInvoice.total)).scalar() or 0
+    total_expenses = db.session.query(func.sum(Expense.amount)).scalar() or 0
+    net_profit = total_sales - total_purchases - total_expenses
+
+    # إحصائيات شهرية للمبيعات
+    current_year = datetime.now().year
+    monthly_sales = db.session.query(
+        extract('month', SalesInvoice.date).label('month'),
+        func.sum(SalesInvoice.total).label('total')
+    ).filter(extract('year', SalesInvoice.date) == current_year).group_by(extract('month', SalesInvoice.date)).all()
+
+    # إحصائيات شهرية للمشتريات
+    monthly_purchases = db.session.query(
+        extract('month', PurchaseInvoice.date).label('month'),
+        func.sum(PurchaseInvoice.total).label('total')
+    ).filter(extract('year', PurchaseInvoice.date) == current_year).group_by(extract('month', PurchaseInvoice.date)).all()
+
+    # إحصائيات المصروفات حسب الفئة
+    expense_by_category = db.session.query(
+        Expense.category,
+        func.sum(Expense.amount).label('total')
+    ).group_by(Expense.category).all()
+
+    # أفضل العملاء (حسب إجمالي المبيعات)
+    top_customers = db.session.query(
+        Customer.name,
+        func.sum(SalesInvoice.total).label('total_sales')
+    ).join(SalesInvoice).group_by(Customer.id, Customer.name).order_by(func.sum(SalesInvoice.total).desc()).limit(5).all()
+
+    # أفضل الموردين (حسب إجمالي المشتريات)
+    top_suppliers = db.session.query(
+        Supplier.name,
+        func.sum(PurchaseInvoice.total).label('total_purchases')
+    ).join(PurchaseInvoice).group_by(Supplier.id, Supplier.name).order_by(func.sum(PurchaseInvoice.total).desc()).limit(5).all()
+
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>التقارير المالية المتقدمة - نظام المحاسبة</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+            body { background-color: #f8f9fa; }
+            .navbar { background: linear-gradient(45deg, #667eea, #764ba2) !important; }
+            .report-card {
+                border-radius: 15px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                transition: transform 0.3s ease;
+            }
+            .report-card:hover { transform: translateY(-5px); }
+            .profit-positive { color: #198754; }
+            .profit-negative { color: #dc3545; }
+            .chart-container {
+                position: relative;
+                height: 400px;
+                margin: 20px 0;
+            }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-calculator me-2"></i>نظام المحاسبة
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="{{ url_for('dashboard') }}">
+                        <i class="fas fa-home me-1"></i>الرئيسية
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h2><i class="fas fa-chart-bar me-2"></i>التقارير المالية المتقدمة</h2>
+                    <p class="text-muted">تحليل شامل للأداء المالي والإحصائيات</p>
+                </div>
+            </div>
+
+            <!-- الملخص المالي -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card report-card bg-success text-white">
+                        <div class="card-body text-center">
+                            <i class="fas fa-arrow-up fa-2x mb-2"></i>
+                            <h4>{{ "%.2f"|format(total_sales) }} ر.س</h4>
+                            <p class="mb-0">إجمالي المبيعات</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card report-card bg-danger text-white">
+                        <div class="card-body text-center">
+                            <i class="fas fa-arrow-down fa-2x mb-2"></i>
+                            <h4>{{ "%.2f"|format(total_purchases) }} ر.س</h4>
+                            <p class="mb-0">إجمالي المشتريات</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card report-card bg-warning text-dark">
+                        <div class="card-body text-center">
+                            <i class="fas fa-receipt fa-2x mb-2"></i>
+                            <h4>{{ "%.2f"|format(total_expenses) }} ر.س</h4>
+                            <p class="mb-0">إجمالي المصروفات</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card report-card {{ 'bg-success' if net_profit >= 0 else 'bg-danger' }} text-white">
+                        <div class="card-body text-center">
+                            <i class="fas fa-chart-line fa-2x mb-2"></i>
+                            <h4>{{ "%.2f"|format(net_profit) }} ر.س</h4>
+                            <p class="mb-0">صافي الربح</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- الرسوم البيانية -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card report-card">
+                        <div class="card-header bg-primary text-white">
+                            <h6 class="mb-0"><i class="fas fa-chart-line me-2"></i>المبيعات والمشتريات الشهرية</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="salesPurchasesChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card report-card">
+                        <div class="card-header bg-info text-white">
+                            <h6 class="mb-0"><i class="fas fa-chart-pie me-2"></i>توزيع المصروفات حسب الفئة</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container">
+                                <canvas id="expensesChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- أفضل العملاء والموردين -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card report-card">
+                        <div class="card-header bg-success text-white">
+                            <h6 class="mb-0"><i class="fas fa-users me-2"></i>أفضل العملاء</h6>
+                        </div>
+                        <div class="card-body">
+                            {% if top_customers %}
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>العميل</th>
+                                            <th>إجمالي المبيعات</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for customer in top_customers %}
+                                        <tr>
+                                            <td>{{ customer.name }}</td>
+                                            <td><strong>{{ "%.2f"|format(customer.total_sales) }} ر.س</strong></td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-muted text-center">لا توجد بيانات عملاء</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card report-card">
+                        <div class="card-header bg-secondary text-white">
+                            <h6 class="mb-0"><i class="fas fa-truck me-2"></i>أفضل الموردين</h6>
+                        </div>
+                        <div class="card-body">
+                            {% if top_suppliers %}
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>المورد</th>
+                                            <th>إجمالي المشتريات</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for supplier in top_suppliers %}
+                                        <tr>
+                                            <td>{{ supplier.name }}</td>
+                                            <td><strong>{{ "%.2f"|format(supplier.total_purchases) }} ر.س</strong></td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-muted text-center">لا توجد بيانات موردين</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- أزرار التقارير -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card report-card">
+                        <div class="card-header bg-dark text-white">
+                            <h6 class="mb-0"><i class="fas fa-file-export me-2"></i>تصدير التقارير</h6>
+                        </div>
+                        <div class="card-body text-center">
+                            <button class="btn btn-success me-2" onclick="printReport()">
+                                <i class="fas fa-print me-2"></i>طباعة التقرير
+                            </button>
+                            <button class="btn btn-primary me-2" onclick="exportPDF()">
+                                <i class="fas fa-file-pdf me-2"></i>تصدير PDF
+                            </button>
+                            <button class="btn btn-info" onclick="exportExcel()">
+                                <i class="fas fa-file-excel me-2"></i>تصدير Excel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            // رسم بياني للمبيعات والمشتريات
+            const salesPurchasesCtx = document.getElementById('salesPurchasesChart').getContext('2d');
+            new Chart(salesPurchasesCtx, {
+                type: 'line',
+                data: {
+                    labels: ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'],
+                    datasets: [{
+                        label: 'المبيعات',
+                        data: [
+                            {% for i in range(1, 13) %}
+                            {{ monthly_sales|selectattr('month', 'equalto', i)|map(attribute='total')|first or 0 }}{{ ',' if not loop.last }}
+                            {% endfor %}
+                        ],
+                        borderColor: 'rgb(25, 135, 84)',
+                        backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                        tension: 0.4
+                    }, {
+                        label: 'المشتريات',
+                        data: [
+                            {% for i in range(1, 13) %}
+                            {{ monthly_purchases|selectattr('month', 'equalto', i)|map(attribute='total')|first or 0 }}{{ ',' if not loop.last }}
+                            {% endfor %}
+                        ],
+                        borderColor: 'rgb(220, 53, 69)',
+                        backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'المبيعات والمشتريات الشهرية ({{ current_year }})'
+                        }
+                    }
+                }
+            });
+
+            // رسم بياني للمصروفات
+            const expensesCtx = document.getElementById('expensesChart').getContext('2d');
+            new Chart(expensesCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: [
+                        {% for category in expense_by_category %}
+                        '{{ category.category }}'{{ ',' if not loop.last }}
+                        {% endfor %}
+                    ],
+                    datasets: [{
+                        data: [
+                            {% for category in expense_by_category %}
+                            {{ category.total }}{{ ',' if not loop.last }}
+                            {% endfor %}
+                        ],
+                        backgroundColor: [
+                            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+                            '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'توزيع المصروفات حسب الفئة'
+                        }
+                    }
+                }
+            });
+
+            // وظائف التصدير
+            function printReport() {
+                window.print();
+            }
+
+            function exportPDF() {
+                alert('سيتم تطوير تصدير PDF قريباً');
+            }
+
+            function exportExcel() {
+                alert('سيتم تطوير تصدير Excel قريباً');
+            }
+        </script>
+    </body>
+    </html>
+    ''',
+    total_sales=total_sales, total_purchases=total_purchases, total_expenses=total_expenses,
+    net_profit=net_profit, monthly_sales=monthly_sales, monthly_purchases=monthly_purchases,
+    expense_by_category=expense_by_category, top_customers=top_customers, top_suppliers=top_suppliers,
+    current_year=current_year)
 
 @app.route('/api/status')
 def api_status():
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>واجهة API - نظام المحاسبة</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/themes/prism.min.css" rel="stylesheet">
+        <style>
+            body { background-color: #f8f9fa; }
+            .navbar { background: linear-gradient(45deg, #667eea, #764ba2) !important; }
+            .api-card {
+                border-radius: 15px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                margin-bottom: 20px;
+            }
+            .endpoint-card {
+                border-left: 4px solid #0d6efd;
+                margin-bottom: 15px;
+            }
+            .method-get { border-left-color: #198754; }
+            .method-post { border-left-color: #fd7e14; }
+            .method-put { border-left-color: #0dcaf0; }
+            .method-delete { border-left-color: #dc3545; }
+            .code-block {
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 5px;
+                padding: 15px;
+                margin: 10px 0;
+            }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-calculator me-2"></i>نظام المحاسبة
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="{{ url_for('dashboard') }}">
+                        <i class="fas fa-home me-1"></i>الرئيسية
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h2><i class="fas fa-code me-2"></i>واجهة API - نظام المحاسبة</h2>
+                    <p class="text-muted">واجهة برمجية شاملة للتكامل مع النظام</p>
+                </div>
+            </div>
+
+            <!-- حالة النظام -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card api-card bg-success text-white">
+                        <div class="card-body text-center">
+                            <i class="fas fa-check-circle fa-2x mb-2"></i>
+                            <h5>نشط</h5>
+                            <p class="mb-0">حالة النظام</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card api-card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <i class="fas fa-code-branch fa-2x mb-2"></i>
+                            <h5>v2.0.0</h5>
+                            <p class="mb-0">إصدار API</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card api-card bg-info text-white">
+                        <div class="card-body text-center">
+                            <i class="fas fa-database fa-2x mb-2"></i>
+                            <h5>متصلة</h5>
+                            <p class="mb-0">قاعدة البيانات</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card api-card bg-warning text-dark">
+                        <div class="card-body text-center">
+                            <i class="fas fa-cloud fa-2x mb-2"></i>
+                            <h5>Render</h5>
+                            <p class="mb-0">منصة النشر</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- نقاط النهاية المتاحة -->
+            <div class="card api-card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="fas fa-list me-2"></i>نقاط النهاية المتاحة (API Endpoints)</h5>
+                </div>
+                <div class="card-body">
+
+                    <!-- العملاء -->
+                    <div class="card endpoint-card method-get">
+                        <div class="card-body">
+                            <h6><span class="badge bg-success">GET</span> /api/customers</h6>
+                            <p class="text-muted">الحصول على قائمة جميع العملاء</p>
+                            <div class="code-block">
+                                <code>curl -X GET {{ request.url_root }}api/customers</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card endpoint-card method-post">
+                        <div class="card-body">
+                            <h6><span class="badge bg-warning">POST</span> /api/customers</h6>
+                            <p class="text-muted">إضافة عميل جديد</p>
+                            <div class="code-block">
+                                <code>curl -X POST {{ request.url_root }}api/customers -H "Content-Type: application/json" -d '{"name": "عميل جديد", "phone": "0501234567"}'</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- الموردين -->
+                    <div class="card endpoint-card method-get">
+                        <div class="card-body">
+                            <h6><span class="badge bg-success">GET</span> /api/suppliers</h6>
+                            <p class="text-muted">الحصول على قائمة جميع الموردين</p>
+                            <div class="code-block">
+                                <code>curl -X GET {{ request.url_root }}api/suppliers</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- المنتجات -->
+                    <div class="card endpoint-card method-get">
+                        <div class="card-body">
+                            <h6><span class="badge bg-success">GET</span> /api/products</h6>
+                            <p class="text-muted">الحصول على قائمة جميع المنتجات</p>
+                            <div class="code-block">
+                                <code>curl -X GET {{ request.url_root }}api/products</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- المبيعات -->
+                    <div class="card endpoint-card method-get">
+                        <div class="card-body">
+                            <h6><span class="badge bg-success">GET</span> /api/sales</h6>
+                            <p class="text-muted">الحصول على قائمة فواتير المبيعات</p>
+                            <div class="code-block">
+                                <code>curl -X GET {{ request.url_root }}api/sales</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- الإحصائيات -->
+                    <div class="card endpoint-card method-get">
+                        <div class="card-body">
+                            <h6><span class="badge bg-success">GET</span> /api/statistics</h6>
+                            <p class="text-muted">الحصول على إحصائيات النظام</p>
+                            <div class="code-block">
+                                <code>curl -X GET {{ request.url_root }}api/statistics</code>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- أمثلة الاستجابة -->
+            <div class="card api-card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-code me-2"></i>أمثلة الاستجابة</h5>
+                </div>
+                <div class="card-body">
+                    <h6>مثال استجابة GET /api/statistics:</h6>
+                    <div class="code-block">
+                        <pre><code class="language-json">{
+  "status": "success",
+  "data": {
+    "customers": 15,
+    "suppliers": 8,
+    "products": 25,
+    "employees": 5,
+    "total_sales": 45000.00,
+    "total_purchases": 32000.00,
+    "total_expenses": 8000.00,
+    "net_profit": 5000.00
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- اختبار API -->
+            <div class="card api-card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-play me-2"></i>اختبار API</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <button class="btn btn-success w-100 mb-2" onclick="testAPI('/api/statistics')">
+                                <i class="fas fa-chart-bar me-2"></i>اختبار الإحصائيات
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <button class="btn btn-primary w-100 mb-2" onclick="testAPI('/api/customers')">
+                                <i class="fas fa-users me-2"></i>اختبار العملاء
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <h6>نتيجة الاختبار:</h6>
+                        <div id="apiResult" class="code-block" style="min-height: 100px;">
+                            <em class="text-muted">اضغط على أحد الأزرار لاختبار API</em>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/components/prism-core.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/plugins/autoloader/prism-autoloader.min.js"></script>
+        <script>
+            async function testAPI(endpoint) {
+                const resultDiv = document.getElementById('apiResult');
+                resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الاختبار...';
+
+                try {
+                    const response = await fetch(endpoint);
+                    const data = await response.json();
+                    resultDiv.innerHTML = '<pre><code class="language-json">' + JSON.stringify(data, null, 2) + '</code></pre>';
+                    Prism.highlightAll();
+                } catch (error) {
+                    resultDiv.innerHTML = '<div class="text-danger">خطأ: ' + error.message + '</div>';
+                }
+            }
+        </script>
+    </body>
+    </html>
+    ''')
+
+# API Endpoints
+@app.route('/api/customers')
+def api_customers():
+    customers = Customer.query.all()
     return jsonify({
-        'status': 'active',
-        'message': 'نظام المحاسبة الاحترافي يعمل بنجاح',
-        'version': '1.0.0',
-        'database': 'متصلة',
-        'deployment': 'Render Cloud Platform'
+        'status': 'success',
+        'data': [{
+            'id': c.id,
+            'name': c.name,
+            'phone': c.phone,
+            'email': c.email,
+            'address': c.address,
+            'created_at': c.created_at.isoformat() if c.created_at else None
+        } for c in customers],
+        'count': len(customers)
     })
+
+@app.route('/api/suppliers')
+def api_suppliers():
+    suppliers = Supplier.query.all()
+    return jsonify({
+        'status': 'success',
+        'data': [{
+            'id': s.id,
+            'name': s.name,
+            'phone': s.phone,
+            'email': s.email,
+            'address': s.address,
+            'created_at': s.created_at.isoformat() if s.created_at else None
+        } for s in suppliers],
+        'count': len(suppliers)
+    })
+
+@app.route('/api/products')
+def api_products():
+    products = Product.query.all()
+    return jsonify({
+        'status': 'success',
+        'data': [{
+            'id': p.id,
+            'name': p.name,
+            'price': float(p.price),
+            'cost': float(p.cost) if p.cost else None,
+            'quantity': p.quantity,
+            'min_quantity': p.min_quantity,
+            'category': p.category,
+            'created_at': p.created_at.isoformat() if p.created_at else None
+        } for p in products],
+        'count': len(products)
+    })
+
+@app.route('/api/sales')
+def api_sales():
+    sales = SalesInvoice.query.all()
+    return jsonify({
+        'status': 'success',
+        'data': [{
+            'id': s.id,
+            'invoice_number': s.invoice_number,
+            'customer_name': s.customer.name if s.customer else 'عميل نقدي',
+            'date': s.date.isoformat(),
+            'total': float(s.total),
+            'status': s.status,
+            'created_at': s.created_at.isoformat() if s.created_at else None
+        } for s in sales],
+        'count': len(sales)
+    })
+
+@app.route('/api/statistics')
+def api_statistics():
+    from sqlalchemy import func
+
+    # إحصائيات أساسية
+    total_customers = Customer.query.count()
+    total_suppliers = Supplier.query.count()
+    total_products = Product.query.count()
+    total_employees = Employee.query.count()
+
+    # إحصائيات مالية
+    total_sales = db.session.query(func.sum(SalesInvoice.total)).scalar() or 0
+    total_purchases = db.session.query(func.sum(PurchaseInvoice.total)).scalar() or 0
+    total_expenses = db.session.query(func.sum(Expense.amount)).scalar() or 0
+    net_profit = total_sales - total_purchases - total_expenses
+
+    return jsonify({
+        'status': 'success',
+        'data': {
+            'counts': {
+                'customers': total_customers,
+                'suppliers': total_suppliers,
+                'products': total_products,
+                'employees': total_employees
+            },
+            'financial': {
+                'total_sales': float(total_sales),
+                'total_purchases': float(total_purchases),
+                'total_expenses': float(total_expenses),
+                'net_profit': float(net_profit)
+            }
+        },
+        'timestamp': datetime.utcnow().isoformat()
+    })
+
+# ===== نظام الإعدادات =====
+
+@app.route('/settings')
+@login_required
+def settings():
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>إعدادات النظام - نظام المحاسبة</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            body { background-color: #f8f9fa; }
+            .navbar { background: linear-gradient(45deg, #667eea, #764ba2) !important; }
+            .settings-card {
+                border-radius: 15px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                margin-bottom: 20px;
+                transition: transform 0.3s ease;
+            }
+            .settings-card:hover { transform: translateY(-2px); }
+            .feature-icon {
+                width: 60px;
+                height: 60px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 24px;
+                color: white;
+                margin: 0 auto 15px;
+            }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-calculator me-2"></i>نظام المحاسبة
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="{{ url_for('dashboard') }}">
+                        <i class="fas fa-home me-1"></i>الرئيسية
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h2><i class="fas fa-cogs me-2"></i>إعدادات النظام</h2>
+                    <p class="text-muted">إدارة وتخصيص إعدادات نظام المحاسبة</p>
+                </div>
+            </div>
+
+            <!-- معلومات النظام -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card settings-card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <div class="feature-icon bg-light text-primary">
+                                <i class="fas fa-info-circle"></i>
+                            </div>
+                            <h6>معلومات النظام</h6>
+                            <p class="mb-0">الإصدار 2.0.0</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card settings-card bg-success text-white">
+                        <div class="card-body text-center">
+                            <div class="feature-icon bg-light text-success">
+                                <i class="fas fa-database"></i>
+                            </div>
+                            <h6>قاعدة البيانات</h6>
+                            <p class="mb-0">SQLite متصلة</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card settings-card bg-warning text-dark">
+                        <div class="card-body text-center">
+                            <div class="feature-icon bg-light text-warning">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <h6>المستخدمين</h6>
+                            <p class="mb-0">{{ current_user.full_name }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card settings-card bg-info text-white">
+                        <div class="card-body text-center">
+                            <div class="feature-icon bg-light text-info">
+                                <i class="fas fa-cloud"></i>
+                            </div>
+                            <h6>النشر</h6>
+                            <p class="mb-0">Render Cloud</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- إعدادات النظام -->
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card settings-card">
+                        <div class="card-header bg-primary text-white">
+                            <h6 class="mb-0"><i class="fas fa-user-cog me-2"></i>إعدادات المستخدم</h6>
+                        </div>
+                        <div class="card-body">
+                            <form>
+                                <div class="mb-3">
+                                    <label class="form-label">الاسم الكامل</label>
+                                    <input type="text" class="form-control" value="{{ current_user.full_name }}" readonly>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">اسم المستخدم</label>
+                                    <input type="text" class="form-control" value="{{ current_user.username }}" readonly>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">الدور</label>
+                                    <input type="text" class="form-control" value="{{ current_user.role }}" readonly>
+                                </div>
+                                <button type="button" class="btn btn-primary" disabled>
+                                    <i class="fas fa-save me-2"></i>حفظ التغييرات
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card settings-card">
+                        <div class="card-header bg-success text-white">
+                            <h6 class="mb-0"><i class="fas fa-cogs me-2"></i>إعدادات النظام</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">اسم الشركة</label>
+                                <input type="text" class="form-control" value="شركة المحاسبة الاحترافية">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">معدل الضريبة (%)</label>
+                                <input type="number" class="form-control" value="15" step="0.01">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">العملة</label>
+                                <select class="form-select">
+                                    <option selected>ريال سعودي (ر.س)</option>
+                                    <option>دولار أمريكي ($)</option>
+                                    <option>يورو (€)</option>
+                                </select>
+                            </div>
+                            <button type="button" class="btn btn-success">
+                                <i class="fas fa-save me-2"></i>حفظ الإعدادات
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- أدوات النظام -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card settings-card">
+                        <div class="card-header bg-dark text-white">
+                            <h6 class="mb-0"><i class="fas fa-tools me-2"></i>أدوات النظام</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="text-center mb-3">
+                                        <div class="feature-icon bg-info">
+                                            <i class="fas fa-download"></i>
+                                        </div>
+                                        <h6>نسخ احتياطي</h6>
+                                        <button class="btn btn-info btn-sm">
+                                            <i class="fas fa-download me-1"></i>إنشاء نسخة
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center mb-3">
+                                        <div class="feature-icon bg-warning">
+                                            <i class="fas fa-upload"></i>
+                                        </div>
+                                        <h6>استعادة</h6>
+                                        <button class="btn btn-warning btn-sm">
+                                            <i class="fas fa-upload me-1"></i>استعادة نسخة
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center mb-3">
+                                        <div class="feature-icon bg-success">
+                                            <i class="fas fa-sync"></i>
+                                        </div>
+                                        <h6>تحديث</h6>
+                                        <button class="btn btn-success btn-sm">
+                                            <i class="fas fa-sync me-1"></i>تحديث النظام
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center mb-3">
+                                        <div class="feature-icon bg-danger">
+                                            <i class="fas fa-trash"></i>
+                                        </div>
+                                        <h6>إعادة تعيين</h6>
+                                        <button class="btn btn-danger btn-sm" onclick="confirmReset()">
+                                            <i class="fas fa-trash me-1"></i>إعادة تعيين
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- معلومات تقنية -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card settings-card">
+                        <div class="card-header bg-secondary text-white">
+                            <h6 class="mb-0"><i class="fas fa-info me-2"></i>معلومات تقنية</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <table class="table table-sm">
+                                        <tr>
+                                            <td><strong>إصدار النظام:</strong></td>
+                                            <td>2.0.0 Professional</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>إصدار Python:</strong></td>
+                                            <td>3.11.7</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>إصدار Flask:</strong></td>
+                                            <td>3.0.0</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>قاعدة البيانات:</strong></td>
+                                            <td>SQLite</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                                <div class="col-md-6">
+                                    <table class="table table-sm">
+                                        <tr>
+                                            <td><strong>منصة النشر:</strong></td>
+                                            <td>Render Cloud Platform</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>تاريخ آخر تحديث:</strong></td>
+                                            <td>{{ moment().format('YYYY-MM-DD HH:mm') }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>حالة النظام:</strong></td>
+                                            <td><span class="badge bg-success">نشط</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>وقت التشغيل:</strong></td>
+                                            <td>متاح 24/7</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            function confirmReset() {
+                if (confirm('هل أنت متأكد من إعادة تعيين النظام؟ سيتم حذف جميع البيانات!')) {
+                    alert('تم إلغاء العملية للحماية');
+                }
+            }
+        </script>
+    </body>
+    </html>
+    ''')
 
 # ===== تهيئة قاعدة البيانات =====
 
