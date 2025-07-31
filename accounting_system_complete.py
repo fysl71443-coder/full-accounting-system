@@ -3061,6 +3061,16 @@ def employees_report():
                     <i class="fas fa-users me-3"></i>تقرير الموظفين التفصيلي
                 </h1>
                 <p class="lead text-muted">تحليل شامل لجميع موظفي الشركة ورواتبهم</p>
+
+                <!-- أزرار التصدير -->
+                <div class="d-flex justify-content-center gap-2 mt-3 no-print">
+                    <a href="{{ url_for('export_pdf', report_type='employees') }}" class="btn btn-danger">
+                        <i class="fas fa-file-pdf me-2"></i>تصدير PDF
+                    </a>
+                    <a href="{{ url_for('export_excel', report_type='employees') }}" class="btn btn-success">
+                        <i class="fas fa-file-excel me-2"></i>تصدير Excel
+                    </a>
+                </div>
             </div>
 
             <!-- الإحصائيات الرئيسية -->
@@ -4858,8 +4868,24 @@ def reports():
                             <div class="report-icon bg-secondary">
                                 <i class="fas fa-money-check-alt"></i>
                             </div>
-                            <h5 class="card-title fw-bold">تقرير الرواتب التفصيلي</h5>
-                            <p class="card-text text-muted">كشوف الرواتب والموظفين مع التحليلات</p>
+                            <h5 class="card-title fw-bold">تقرير الموظفين التفصيلي</h5>
+                            <p class="card-text text-muted">تحليل شامل للموظفين ورواتبهم مع الإحصائيات</p>
+                            <a href="{{ url_for('employees_report') }}" class="btn btn-report">
+                                <i class="fas fa-file-alt me-2"></i>عرض التقرير
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- تقرير كشوف الرواتب -->
+                <div class="col-md-6 col-lg-4">
+                    <div class="report-card h-100">
+                        <div class="card-body text-center p-4">
+                            <div class="report-icon bg-success">
+                                <i class="fas fa-money-check"></i>
+                            </div>
+                            <h5 class="card-title fw-bold">تقرير كشوف الرواتب</h5>
+                            <p class="card-text text-muted">تحليل شامل لجميع كشوف الرواتب والمدفوعات</p>
                             <a href="{{ url_for('payroll_report') }}" class="btn btn-report">
                                 <i class="fas fa-file-alt me-2"></i>عرض التقرير
                             </a>
@@ -4907,8 +4933,19 @@ def reports():
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
         <script>
             function generateQuickReport(period) {
-                alert('سيتم إنشاء التقرير ' + period + ' قريباً');
-                // يمكن إضافة وظيفة AJAX هنا لإنشاء التقارير السريعة
+                // إنشاء التقارير السريعة
+                const reportUrls = {
+                    'daily': '/quick_report/daily',
+                    'weekly': '/quick_report/weekly',
+                    'monthly': '/quick_report/monthly',
+                    'yearly': '/quick_report/yearly'
+                };
+
+                if (reportUrls[period]) {
+                    window.open(reportUrls[period], '_blank');
+                } else {
+                    alert('نوع التقرير غير مدعوم');
+                }
             }
         </script>
     </body>
@@ -5773,6 +5810,12 @@ def expenses_report():
                     <button class="btn btn-light me-2" onclick="window.print()">
                         <i class="fas fa-print me-1"></i>طباعة
                     </button>
+                    <a href="{{ url_for('export_pdf', report_type='expenses') }}" class="btn btn-danger me-2">
+                        <i class="fas fa-file-pdf me-1"></i>PDF
+                    </a>
+                    <a href="{{ url_for('export_excel', report_type='expenses') }}" class="btn btn-success me-2">
+                        <i class="fas fa-file-excel me-1"></i>Excel
+                    </a>
                     <div class="dropdown me-2">
                         <button class="btn btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
                             <i class="fas fa-filter me-1"></i>فلترة
@@ -6055,6 +6098,12 @@ def inventory_report():
                     <button class="btn btn-light me-2" onclick="window.print()">
                         <i class="fas fa-print me-1"></i>طباعة
                     </button>
+                    <a href="{{ url_for('export_pdf', report_type='inventory') }}" class="btn btn-danger me-2">
+                        <i class="fas fa-file-pdf me-1"></i>PDF
+                    </a>
+                    <a href="{{ url_for('export_excel', report_type='inventory') }}" class="btn btn-success me-2">
+                        <i class="fas fa-file-excel me-1"></i>Excel
+                    </a>
                     <div class="dropdown me-2">
                         <button class="btn btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
                             <i class="fas fa-filter me-1"></i>فلترة
@@ -6263,9 +6312,417 @@ def inventory_report():
 @app.route('/payroll_report')
 @login_required
 def payroll_report():
-    employees = Employee.query.filter_by(status='active').all()
-    return render_template_string('<h1>تقرير الرواتب التفصيلي</h1><p>قيد التطوير</p>')
     from sqlalchemy import func, extract
+    from datetime import datetime
+
+    # جلب جميع كشوف الرواتب
+    payrolls = EmployeePayroll.query.order_by(EmployeePayroll.year.desc(), EmployeePayroll.month.desc()).all()
+
+    # إحصائيات عامة
+    total_payrolls = len(payrolls)
+    paid_payrolls = len([p for p in payrolls if p.status == 'paid'])
+    pending_payrolls = len([p for p in payrolls if p.status == 'pending'])
+
+    # إجمالي المبالغ
+    total_gross = sum(p.gross_salary for p in payrolls)
+    total_net = sum(p.net_salary for p in payrolls)
+    total_deductions = sum(p.deductions for p in payrolls)
+
+    # كشوف الرواتب حسب الشهر
+    monthly_payrolls = {}
+    for payroll in payrolls:
+        key = f"{payroll.year}-{payroll.month:02d}"
+        if key not in monthly_payrolls:
+            monthly_payrolls[key] = []
+        monthly_payrolls[key].append(payroll)
+
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>تقرير كشوف الرواتب - نظام المحاسبة</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+            body {
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+            .navbar {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            }
+            .stat-card {
+                background: white;
+                border-radius: 20px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                transition: all 0.3s ease;
+                border: none;
+                overflow: hidden;
+            }
+            .stat-card:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+            }
+            .chart-container {
+                position: relative;
+                height: 400px;
+                margin: 20px 0;
+            }
+            @media print {
+                .no-print { display: none !important; }
+                body { background: white !important; }
+                .stat-card { box-shadow: none !important; border: 1px solid #ddd !important; }
+            }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand-lg navbar-dark no-print">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-calculator me-2"></i>نظام المحاسبة الاحترافي
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <button class="btn btn-light me-2" onclick="window.print()">
+                        <i class="fas fa-print me-1"></i>طباعة
+                    </button>
+                    <a href="{{ url_for('export_pdf', report_type='payroll') }}" class="btn btn-danger me-2">
+                        <i class="fas fa-file-pdf me-1"></i>PDF
+                    </a>
+                    <a href="{{ url_for('export_excel', report_type='payroll') }}" class="btn btn-success me-2">
+                        <i class="fas fa-file-excel me-1"></i>Excel
+                    </a>
+                    <div class="dropdown me-2">
+                        <button class="btn btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-filter me-1"></i>فلترة
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="?status=paid">المدفوعة</a></li>
+                            <li><a class="dropdown-item" href="?status=pending">المعلقة</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('payroll_report') }}">جميع كشوف الرواتب</a></li>
+                        </ul>
+                    </div>
+                    <a class="nav-link" href="{{ url_for('reports') }}">
+                        <i class="fas fa-arrow-right me-1"></i>رجوع للتقارير
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <div class="text-center mb-5">
+                <h1 class="display-4 fw-bold text-success">
+                    <i class="fas fa-money-check me-3"></i>تقرير كشوف الرواتب
+                </h1>
+                <p class="lead text-muted">تحليل شامل لجميع كشوف الرواتب والمدفوعات</p>
+            </div>
+
+            <!-- الإحصائيات الرئيسية -->
+            <div class="row g-4 mb-5">
+                <div class="col-md-3">
+                    <div class="stat-card text-center p-4">
+                        <div class="text-success mb-3">
+                            <i class="fas fa-file-invoice-dollar fa-3x"></i>
+                        </div>
+                        <h3 class="fw-bold text-success">{{ total_payrolls }}</h3>
+                        <p class="text-muted mb-0">إجمالي كشوف الرواتب</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card text-center p-4">
+                        <div class="text-primary mb-3">
+                            <i class="fas fa-check-circle fa-3x"></i>
+                        </div>
+                        <h3 class="fw-bold text-primary">{{ paid_payrolls }}</h3>
+                        <p class="text-muted mb-0">كشوف مدفوعة</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card text-center p-4">
+                        <div class="text-warning mb-3">
+                            <i class="fas fa-clock fa-3x"></i>
+                        </div>
+                        <h3 class="fw-bold text-warning">{{ pending_payrolls }}</h3>
+                        <p class="text-muted mb-0">كشوف معلقة</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card text-center p-4">
+                        <div class="text-info mb-3">
+                            <i class="fas fa-money-bill-wave fa-3x"></i>
+                        </div>
+                        <h3 class="fw-bold text-info">{{ "%.0f"|format(total_net) }}</h3>
+                        <p class="text-muted mb-0">إجمالي صافي الرواتب (ر.س)</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- جدول كشوف الرواتب -->
+            <div class="row mb-5">
+                <div class="col-12">
+                    <div class="stat-card">
+                        <div class="card-header bg-success text-white p-4">
+                            <h5 class="mb-0 fw-bold">
+                                <i class="fas fa-list me-2"></i>جميع كشوف الرواتب
+                            </h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>الموظف</th>
+                                            <th>الشهر/السنة</th>
+                                            <th>الراتب الأساسي</th>
+                                            <th>الساعات الإضافية</th>
+                                            <th>البدلات</th>
+                                            <th>الاستقطاعات</th>
+                                            <th>صافي الراتب</th>
+                                            <th>الحالة</th>
+                                            <th>تاريخ الإنشاء</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for payroll in payrolls %}
+                                        <tr>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="avatar-circle bg-success text-white me-2" style="width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem;">
+                                                        {{ payroll.employee.name[0].upper() }}
+                                                    </div>
+                                                    <strong>{{ payroll.employee.name }}</strong>
+                                                </div>
+                                            </td>
+                                            <td>{{ payroll.month }}/{{ payroll.year }}</td>
+                                            <td class="fw-bold text-primary">{{ "%.2f"|format(payroll.basic_salary) }} ر.س</td>
+                                            <td class="text-info">{{ "%.2f"|format(payroll.overtime_amount) }} ر.س</td>
+                                            <td class="text-success">{{ "%.2f"|format(payroll.allowances) }} ر.س</td>
+                                            <td class="text-danger">{{ "%.2f"|format(payroll.deductions) }} ر.س</td>
+                                            <td class="fw-bold text-success">{{ "%.2f"|format(payroll.net_salary) }} ر.س</td>
+                                            <td>
+                                                <span class="badge {% if payroll.status == 'paid' %}bg-success{% else %}bg-warning{% endif %}">
+                                                    {{ 'مدفوع' if payroll.status == 'paid' else 'معلق' }}
+                                                </span>
+                                            </td>
+                                            <td>{{ payroll.created_at.strftime('%Y-%m-%d') if payroll.created_at else '-' }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    </body>
+    </html>
+    ''', payrolls=payrolls, total_payrolls=total_payrolls, paid_payrolls=paid_payrolls,
+         pending_payrolls=pending_payrolls, total_gross=total_gross, total_net=total_net,
+         total_deductions=total_deductions, monthly_payrolls=monthly_payrolls)
+
+# التقارير السريعة
+@app.route('/quick_report/<period>')
+@login_required
+def quick_report(period):
+    from datetime import datetime, timedelta
+    from sqlalchemy import func, extract
+
+    # تحديد الفترة الزمنية
+    today = datetime.now().date()
+
+    if period == 'daily':
+        start_date = today
+        end_date = today
+        title = f"التقرير اليومي - {today.strftime('%Y-%m-%d')}"
+    elif period == 'weekly':
+        start_date = today - timedelta(days=today.weekday())
+        end_date = start_date + timedelta(days=6)
+        title = f"التقرير الأسبوعي - {start_date.strftime('%Y-%m-%d')} إلى {end_date.strftime('%Y-%m-%d')}"
+    elif period == 'monthly':
+        start_date = today.replace(day=1)
+        if today.month == 12:
+            end_date = today.replace(year=today.year + 1, month=1, day=1) - timedelta(days=1)
+        else:
+            end_date = today.replace(month=today.month + 1, day=1) - timedelta(days=1)
+        title = f"التقرير الشهري - {today.strftime('%Y-%m')}"
+    elif period == 'yearly':
+        start_date = today.replace(month=1, day=1)
+        end_date = today.replace(month=12, day=31)
+        title = f"التقرير السنوي - {today.year}"
+    else:
+        flash('نوع التقرير غير مدعوم', 'error')
+        return redirect(url_for('reports'))
+
+    # جلب البيانات للفترة المحددة
+    sales = SalesInvoice.query.filter(
+        SalesInvoice.date >= start_date,
+        SalesInvoice.date <= end_date
+    ).all()
+
+    purchases = PurchaseInvoice.query.filter(
+        PurchaseInvoice.date >= start_date,
+        PurchaseInvoice.date <= end_date
+    ).all()
+
+    expenses = Expense.query.filter(
+        Expense.date >= start_date,
+        Expense.date <= end_date
+    ).all()
+
+    # حساب الإجماليات
+    total_sales = sum(sale.total for sale in sales)
+    total_purchases = sum(purchase.total for purchase in purchases)
+    total_expenses = sum(expense.amount for expense in expenses)
+    net_profit = total_sales - total_purchases - total_expenses
+
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>{{ title }} - نظام المحاسبة</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            body {
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+            .stat-card {
+                background: white;
+                border-radius: 15px;
+                box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+                border: none;
+                overflow: hidden;
+            }
+            @media print {
+                .no-print { display: none !important; }
+                body { background: white !important; }
+                .stat-card { box-shadow: none !important; border: 1px solid #ddd !important; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container mt-4">
+            <div class="text-center mb-5">
+                <h1 class="display-5 fw-bold text-primary">{{ title }}</h1>
+                <p class="lead text-muted">ملخص الأداء المالي للفترة المحددة</p>
+            </div>
+
+            <!-- الإحصائيات الرئيسية -->
+            <div class="row g-4 mb-5">
+                <div class="col-md-3">
+                    <div class="stat-card text-center p-4">
+                        <div class="text-success mb-3">
+                            <i class="fas fa-arrow-up fa-3x"></i>
+                        </div>
+                        <h3 class="fw-bold text-success">{{ "%.2f"|format(total_sales) }}</h3>
+                        <p class="text-muted mb-0">إجمالي المبيعات (ر.س)</p>
+                        <small class="text-muted">{{ sales|length }} فاتورة</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card text-center p-4">
+                        <div class="text-warning mb-3">
+                            <i class="fas fa-arrow-down fa-3x"></i>
+                        </div>
+                        <h3 class="fw-bold text-warning">{{ "%.2f"|format(total_purchases) }}</h3>
+                        <p class="text-muted mb-0">إجمالي المشتريات (ر.س)</p>
+                        <small class="text-muted">{{ purchases|length }} فاتورة</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card text-center p-4">
+                        <div class="text-danger mb-3">
+                            <i class="fas fa-minus-circle fa-3x"></i>
+                        </div>
+                        <h3 class="fw-bold text-danger">{{ "%.2f"|format(total_expenses) }}</h3>
+                        <p class="text-muted mb-0">إجمالي المصروفات (ر.س)</p>
+                        <small class="text-muted">{{ expenses|length }} مصروف</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card text-center p-4">
+                        <div class="{% if net_profit >= 0 %}text-primary{% else %}text-danger{% endif %} mb-3">
+                            <i class="fas fa-chart-line fa-3x"></i>
+                        </div>
+                        <h3 class="fw-bold {% if net_profit >= 0 %}text-primary{% else %}text-danger{% endif %}">
+                            {{ "%.2f"|format(net_profit) }}
+                        </h3>
+                        <p class="text-muted mb-0">صافي الربح (ر.س)</p>
+                        <small class="{% if net_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {% if net_profit >= 0 %}ربح{% else %}خسارة{% endif %}
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- تفاصيل المبيعات -->
+            {% if sales %}
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="stat-card">
+                        <div class="card-header bg-success text-white p-3">
+                            <h5 class="mb-0"><i class="fas fa-shopping-cart me-2"></i>تفاصيل المبيعات</h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>رقم الفاتورة</th>
+                                            <th>العميل</th>
+                                            <th>التاريخ</th>
+                                            <th>المبلغ</th>
+                                            <th>الحالة</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for sale in sales %}
+                                        <tr>
+                                            <td><strong>{{ sale.invoice_number }}</strong></td>
+                                            <td>{{ sale.customer.name if sale.customer else 'عميل نقدي' }}</td>
+                                            <td>{{ sale.date.strftime('%Y-%m-%d') }}</td>
+                                            <td class="fw-bold text-success">{{ "%.2f"|format(sale.total) }} ر.س</td>
+                                            <td>
+                                                <span class="badge {% if sale.status == 'paid' %}bg-success{% elif sale.status == 'pending' %}bg-warning{% else %}bg-danger{% endif %}">
+                                                    {% if sale.status == 'paid' %}مدفوعة{% elif sale.status == 'pending' %}معلقة{% else %}ملغية{% endif %}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- أزرار الإجراءات -->
+            <div class="text-center mt-4 no-print">
+                <button class="btn btn-primary btn-lg me-2" onclick="window.print()">
+                    <i class="fas fa-print me-2"></i>طباعة التقرير
+                </button>
+                <button class="btn btn-secondary btn-lg" onclick="window.close()">
+                    <i class="fas fa-times me-2"></i>إغلاق
+                </button>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    </body>
+    </html>
+    ''', title=title, sales=sales, purchases=purchases, expenses=expenses,
+         total_sales=total_sales, total_purchases=total_purchases,
+         total_expenses=total_expenses, net_profit=net_profit)
     from datetime import datetime, timedelta
 
     # إحصائيات عامة
@@ -7240,16 +7697,76 @@ def delete_expense(expense_id):
 @app.route('/export_pdf/<report_type>')
 @login_required
 def export_pdf(report_type):
-    # هذه وظيفة أساسية للتصدير - يمكن تطويرها لاحقاً
-    flash('سيتم تطوير تصدير PDF قريباً', 'info')
-    return redirect(request.referrer or url_for('dashboard'))
+    """تصدير التقارير كـ PDF (محاكاة)"""
+    try:
+        # محاكاة تصدير PDF
+        report_names = {
+            'sales': 'تقرير المبيعات',
+            'purchases': 'تقرير المشتريات',
+            'expenses': 'تقرير المصروفات',
+            'inventory': 'تقرير المخزون',
+            'employees': 'تقرير الموظفين',
+            'payroll': 'تقرير كشوف الرواتب'
+        }
+
+        report_name = report_names.get(report_type, 'التقرير')
+
+        # في التطبيق الحقيقي، هنا سيتم إنشاء ملف PDF
+        flash(f'تم تصدير {report_name} بصيغة PDF بنجاح! (محاكاة)', 'success')
+
+        # إعادة توجيه للتقرير المناسب
+        report_routes = {
+            'sales': 'sales',
+            'purchases': 'purchases',
+            'expenses': 'expenses_report',
+            'inventory': 'inventory_report',
+            'employees': 'employees_report',
+            'payroll': 'payroll_report'
+        }
+
+        route = report_routes.get(report_type, 'reports')
+        return redirect(url_for(route))
+
+    except Exception as e:
+        flash(f'حدث خطأ أثناء التصدير: {str(e)}', 'error')
+        return redirect(request.referrer or url_for('dashboard'))
 
 @app.route('/export_excel/<report_type>')
 @login_required
 def export_excel(report_type):
-    # هذه وظيفة أساسية للتصدير - يمكن تطويرها لاحقاً
-    flash('سيتم تطوير تصدير Excel قريباً', 'info')
-    return redirect(request.referrer or url_for('dashboard'))
+    """تصدير التقارير كـ Excel (محاكاة)"""
+    try:
+        # محاكاة تصدير Excel
+        report_names = {
+            'sales': 'تقرير المبيعات',
+            'purchases': 'تقرير المشتريات',
+            'expenses': 'تقرير المصروفات',
+            'inventory': 'تقرير المخزون',
+            'employees': 'تقرير الموظفين',
+            'payroll': 'تقرير كشوف الرواتب'
+        }
+
+        report_name = report_names.get(report_type, 'التقرير')
+
+        # في التطبيق الحقيقي، هنا سيتم إنشاء ملف Excel
+        flash(f'تم تصدير {report_name} بصيغة Excel بنجاح! (محاكاة)', 'success')
+
+        # إعادة توجيه للتقرير المناسب
+        report_routes = {
+            'sales': 'sales',
+            'purchases': 'purchases',
+            'expenses': 'expenses_report',
+            'inventory': 'inventory_report',
+            'employees': 'employees_report',
+            'payroll': 'payroll_report'
+        }
+
+        route = report_routes.get(report_type, 'reports')
+        return redirect(url_for(route))
+
+    except Exception as e:
+        flash(f'حدث خطأ أثناء التصدير: {str(e)}', 'error')
+        return redirect(request.referrer or url_for('dashboard'))
 
 # ===== تحديث الملف الشخصي =====
 
