@@ -35,6 +35,15 @@ except ImportError:
     SECURITY_ENABLED = False
     print("⚠️ نظام الحماية غير متوفر - سيتم التشغيل بدون حماية متقدمة")
 
+# استيراد نظام حظر IP
+try:
+    from ip_blocker import init_ip_blocker
+    IP_BLOCKER_ENABLED = True
+    print("🚫 تم تحميل نظام حظر IP المتقدم")
+except ImportError:
+    IP_BLOCKER_ENABLED = False
+    print("⚠️ نظام حظر IP غير متوفر")
+
 # إنشاء التطبيق
 app = Flask(__name__)
 
@@ -10455,6 +10464,22 @@ if SECURITY_ENABLED:
     except Exception as e:
         print(f"❌ خطأ في تفعيل نظام الحماية: {e}")
         SECURITY_ENABLED = False
+
+# تفعيل نظام حظر IP المتقدم
+if IP_BLOCKER_ENABLED:
+    try:
+        ip_blocker_system = init_ip_blocker(app)
+        print("🚫 تم تفعيل نظام حظر IP المتقدم بنجاح")
+        print("🔒 نظام حظر IP يشمل:")
+        print("   - حظر IP: 144.86.9.109 (المطلوب)")
+        print("   - حظر IPs مشبوهة تلقائياً")
+        print("   - تتبع محاولات الوصول")
+        print("   - حظر تلقائي للطلبات المفرطة")
+        print("   - سجلات مفصلة للمحاولات المحظورة")
+        print("🌐 إدارة IPs المحظورة: /admin/blocked-ips")
+    except Exception as e:
+        print(f"❌ خطأ في تفعيل نظام حظر IP: {e}")
+        IP_BLOCKER_ENABLED = False
 
 # للنشر على Render
 init_db()
