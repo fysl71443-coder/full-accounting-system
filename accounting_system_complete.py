@@ -692,11 +692,11 @@ def dashboard():
                 </div>
 
                 <div class="col-md-4">
-                    <a href="{{ url_for('api_status') }}" class="function-card d-block">
+                    <a href="{{ url_for('payments') }}" class="function-card d-block">
                         <div class="text-center">
-                            <i class="fas fa-code fa-2x text-info mb-3"></i>
-                            <h5>واجهة API</h5>
-                            <p class="text-muted">واجهة برمجية للتكامل</p>
+                            <i class="fas fa-credit-card fa-2x text-info mb-3"></i>
+                            <h5>المدفوعات والمستحقات</h5>
+                            <p class="text-muted">إدارة المدفوعات والديون</p>
                         </div>
                     </a>
                 </div>
@@ -1538,6 +1538,7 @@ def sales():
                                             <option value="stc">STC Pay</option>
                                             <option value="gcc">GCC Pay</option>
                                             <option value="aks">أكس</option>
+                                            <option value="credit">آجل</option>
                                         </select>
                                     </div>
                                 </div>
@@ -2160,6 +2161,7 @@ def purchases():
                                             <option value="stc">STC Pay</option>
                                             <option value="gcc">GCC Pay</option>
                                             <option value="aks">أكس</option>
+                                            <option value="credit">آجل</option>
                                         </select>
                                     </div>
                                 </div>
@@ -3477,6 +3479,7 @@ def print_invoice(sale_id):
                                 {% elif sale.payment_method == 'mastercard' %}#dc3545
                                 {% elif sale.payment_method == 'stc' %}#20c997
                                 {% elif sale.payment_method == 'gcc' %}#fd7e14
+                                {% elif sale.payment_method == 'credit' %}#ffc107
                                 {% else %}#6c757d{% endif %};">
                                 {% if sale.payment_method == 'cash' %}نقدي
                                 {% elif sale.payment_method == 'mada' %}مدى
@@ -3486,6 +3489,7 @@ def print_invoice(sale_id):
                                 {% elif sale.payment_method == 'gcc' %}GCC Pay
                                 {% elif sale.payment_method == 'aks' %}أكس
                                 {% elif sale.payment_method == 'bank' %}تحويل بنكي
+                                {% elif sale.payment_method == 'credit' %}آجل
                                 {% else %}{{ sale.payment_method }}{% endif %}
                             </span>
                         </p>
@@ -3729,6 +3733,7 @@ def print_purchase(purchase_id):
                                 {% elif purchase.payment_method == 'gcc' %}GCC Pay
                                 {% elif purchase.payment_method == 'aks' %}أكس
                                 {% elif purchase.payment_method == 'bank' %}تحويل بنكي
+                                {% elif purchase.payment_method == 'credit' %}آجل
                                 {% else %}{{ purchase.payment_method }}{% endif %}
                             </span>
                         </p>
@@ -4889,6 +4894,27 @@ def reports():
                             <a href="{{ url_for('payroll_report') }}" class="btn btn-report">
                                 <i class="fas fa-file-alt me-2"></i>عرض التقرير
                             </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- تقرير المدفوعات والمستحقات -->
+                <div class="col-md-6 col-lg-4">
+                    <div class="report-card h-100">
+                        <div class="card-body text-center p-4">
+                            <div class="report-icon bg-info">
+                                <i class="fas fa-credit-card"></i>
+                            </div>
+                            <h5 class="card-title fw-bold">تقرير المدفوعات والمستحقات</h5>
+                            <p class="card-text text-muted">إدارة شاملة للمدفوعات والديون والمستحقات</p>
+                            <div class="d-grid gap-2">
+                                <a href="{{ url_for('payments') }}" class="btn btn-report">
+                                    <i class="fas fa-credit-card me-2"></i>إدارة المدفوعات
+                                </a>
+                                <a href="{{ url_for('payments_report') }}" class="btn btn-outline-info">
+                                    <i class="fas fa-chart-line me-2"></i>التقرير التفصيلي
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -6723,6 +6749,512 @@ def quick_report(period):
     ''', title=title, sales=sales, purchases=purchases, expenses=expenses,
          total_sales=total_sales, total_purchases=total_purchases,
          total_expenses=total_expenses, net_profit=net_profit)
+
+# شاشة المدفوعات والمستحقات
+@app.route('/payments')
+@login_required
+def payments():
+    from sqlalchemy import or_
+
+    # جلب جميع فواتير المبيعات
+    sales_invoices = SalesInvoice.query.order_by(SalesInvoice.date.desc()).all()
+
+    # جلب جميع فواتير المشتريات
+    purchase_invoices = PurchaseInvoice.query.order_by(PurchaseInvoice.date.desc()).all()
+
+    # تصنيف الفواتير
+    paid_sales = [s for s in sales_invoices if s.status == 'paid']
+    unpaid_sales = [s for s in sales_invoices if s.status in ['pending', 'overdue']]
+    credit_sales = [s for s in sales_invoices if s.payment_method == 'credit']
+
+    paid_purchases = [p for p in purchase_invoices if p.status == 'paid']
+    unpaid_purchases = [p for p in purchase_invoices if p.status in ['pending', 'overdue']]
+    credit_purchases = [p for p in purchase_invoices if p.payment_method == 'credit']
+
+    # حساب الإجماليات
+    total_receivables = sum(s.total for s in unpaid_sales)
+    total_payables = sum(p.total for p in unpaid_purchases)
+    total_paid_sales = sum(s.total for s in paid_sales)
+    total_paid_purchases = sum(p.total for p in paid_purchases)
+
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>المدفوعات والمستحقات - نظام المحاسبة</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            body {
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+            .navbar {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            }
+            .stat-card {
+                background: white;
+                border-radius: 20px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                transition: all 0.3s ease;
+                border: none;
+                overflow: hidden;
+            }
+            .stat-card:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+            }
+            .payment-status-badge {
+                padding: 8px 15px;
+                border-radius: 20px;
+                font-weight: bold;
+                color: white;
+                display: inline-block;
+            }
+            .overdue { background-color: #dc3545; }
+            .pending { background-color: #ffc107; color: #000; }
+            .paid { background-color: #28a745; }
+            .credit { background-color: #17a2b8; }
+
+            @media print {
+                .no-print { display: none !important; }
+                body { background: white !important; }
+                .stat-card { box-shadow: none !important; border: 1px solid #ddd !important; }
+            }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand-lg navbar-dark no-print">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-calculator me-2"></i>نظام المحاسبة الاحترافي
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <button class="btn btn-light me-2" onclick="window.print()">
+                        <i class="fas fa-print me-1"></i>طباعة
+                    </button>
+                    <div class="dropdown me-2">
+                        <button class="btn btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-filter me-1"></i>فلترة
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="?filter=paid">المدفوعة</a></li>
+                            <li><a class="dropdown-item" href="?filter=pending">المعلقة</a></li>
+                            <li><a class="dropdown-item" href="?filter=overdue">المتأخرة</a></li>
+                            <li><a class="dropdown-item" href="?filter=credit">الآجلة</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('payments') }}">جميع المدفوعات</a></li>
+                        </ul>
+                    </div>
+                    <a class="nav-link" href="{{ url_for('dashboard') }}">
+                        <i class="fas fa-home me-1"></i>الرئيسية
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <div class="text-center mb-5">
+                <h1 class="display-4 fw-bold text-primary">
+                    <i class="fas fa-credit-card me-3"></i>المدفوعات والمستحقات
+                </h1>
+                <p class="lead text-muted">إدارة شاملة للمدفوعات والمستحقات والديون</p>
+            </div>
+
+            <!-- الإحصائيات الرئيسية -->
+            <div class="row g-4 mb-5">
+                <div class="col-md-3">
+                    <div class="stat-card text-center p-4">
+                        <div class="text-success mb-3">
+                            <i class="fas fa-arrow-down fa-3x"></i>
+                        </div>
+                        <h3 class="fw-bold text-success">{{ "%.2f"|format(total_receivables) }}</h3>
+                        <p class="text-muted mb-0">المستحقات (ر.س)</p>
+                        <small class="text-muted">{{ unpaid_sales|length }} فاتورة</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card text-center p-4">
+                        <div class="text-danger mb-3">
+                            <i class="fas fa-arrow-up fa-3x"></i>
+                        </div>
+                        <h3 class="fw-bold text-danger">{{ "%.2f"|format(total_payables) }}</h3>
+                        <p class="text-muted mb-0">المدفوعات المستحقة (ر.س)</p>
+                        <small class="text-muted">{{ unpaid_purchases|length }} فاتورة</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card text-center p-4">
+                        <div class="text-primary mb-3">
+                            <i class="fas fa-check-circle fa-3x"></i>
+                        </div>
+                        <h3 class="fw-bold text-primary">{{ "%.2f"|format(total_paid_sales) }}</h3>
+                        <p class="text-muted mb-0">المبيعات المدفوعة (ر.س)</p>
+                        <small class="text-muted">{{ paid_sales|length }} فاتورة</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card text-center p-4">
+                        <div class="text-info mb-3">
+                            <i class="fas fa-balance-scale fa-3x"></i>
+                        </div>
+                        <h3 class="fw-bold text-info">{{ "%.2f"|format(total_receivables - total_payables) }}</h3>
+                        <p class="text-muted mb-0">صافي المستحقات (ر.س)</p>
+                        <small class="{% if total_receivables - total_payables >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {% if total_receivables - total_payables >= 0 %}لصالحنا{% else %}علينا{% endif %}
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- تبويبات المدفوعات -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="stat-card">
+                        <div class="card-header bg-primary text-white p-4">
+                            <ul class="nav nav-tabs card-header-tabs" id="paymentsTab" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active text-white" id="receivables-tab" data-bs-toggle="tab" data-bs-target="#receivables" type="button" role="tab">
+                                        <i class="fas fa-arrow-down me-2"></i>المستحقات لنا ({{ unpaid_sales|length }})
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link text-white" id="payables-tab" data-bs-toggle="tab" data-bs-target="#payables" type="button" role="tab">
+                                        <i class="fas fa-arrow-up me-2"></i>المستحقات علينا ({{ unpaid_purchases|length }})
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link text-white" id="paid-tab" data-bs-toggle="tab" data-bs-target="#paid" type="button" role="tab">
+                                        <i class="fas fa-check-circle me-2"></i>المدفوعات ({{ (paid_sales|length + paid_purchases|length) }})
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link text-white" id="credit-tab" data-bs-toggle="tab" data-bs-target="#credit" type="button" role="tab">
+                                        <i class="fas fa-clock me-2"></i>الآجلة ({{ (credit_sales|length + credit_purchases|length) }})
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="tab-content" id="paymentsTabContent">
+                                <!-- المستحقات لنا -->
+                                <div class="tab-pane fade show active" id="receivables" role="tabpanel">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover mb-0">
+                                            <thead class="table-success">
+                                                <tr>
+                                                    <th>رقم الفاتورة</th>
+                                                    <th>العميل</th>
+                                                    <th>التاريخ</th>
+                                                    <th>المبلغ</th>
+                                                    <th>طريقة الدفع</th>
+                                                    <th>الحالة</th>
+                                                    <th class="no-print">الإجراءات</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for sale in unpaid_sales %}
+                                                <tr>
+                                                    <td><strong>{{ sale.invoice_number }}</strong></td>
+                                                    <td>{{ sale.customer.name if sale.customer else 'عميل نقدي' }}</td>
+                                                    <td>{{ sale.date.strftime('%Y-%m-%d') }}</td>
+                                                    <td class="fw-bold text-success">{{ "%.2f"|format(sale.total) }} ر.س</td>
+                                                    <td>
+                                                        <span class="badge bg-info">
+                                                            {% if sale.payment_method == 'cash' %}نقدي
+                                                            {% elif sale.payment_method == 'credit' %}آجل
+                                                            {% else %}{{ sale.payment_method }}{% endif %}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="payment-status-badge {% if sale.status == 'pending' %}pending{% else %}overdue{% endif %}">
+                                                            {% if sale.status == 'pending' %}معلقة{% else %}متأخرة{% endif %}
+                                                        </span>
+                                                    </td>
+                                                    <td class="no-print">
+                                                        <button class="btn btn-sm btn-success" onclick="markAsPaid('sale', {{ sale.id }})">
+                                                            <i class="fas fa-check"></i> تحصيل
+                                                        </button>
+                                                        <button class="btn btn-sm btn-warning" onclick="markAsOverdue('sale', {{ sale.id }})">
+                                                            <i class="fas fa-clock"></i> متأخرة
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- المستحقات علينا -->
+                                <div class="tab-pane fade" id="payables" role="tabpanel">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover mb-0">
+                                            <thead class="table-danger">
+                                                <tr>
+                                                    <th>رقم الفاتورة</th>
+                                                    <th>المورد</th>
+                                                    <th>التاريخ</th>
+                                                    <th>المبلغ</th>
+                                                    <th>طريقة الدفع</th>
+                                                    <th>الحالة</th>
+                                                    <th class="no-print">الإجراءات</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for purchase in unpaid_purchases %}
+                                                <tr>
+                                                    <td><strong>{{ purchase.invoice_number }}</strong></td>
+                                                    <td>{{ purchase.supplier.name }}</td>
+                                                    <td>{{ purchase.date.strftime('%Y-%m-%d') }}</td>
+                                                    <td class="fw-bold text-danger">{{ "%.2f"|format(purchase.total) }} ر.س</td>
+                                                    <td>
+                                                        <span class="badge bg-secondary">
+                                                            {% if purchase.payment_method == 'cash' %}نقدي
+                                                            {% elif purchase.payment_method == 'credit' %}آجل
+                                                            {% else %}{{ purchase.payment_method }}{% endif %}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="payment-status-badge {% if purchase.status == 'pending' %}pending{% else %}overdue{% endif %}">
+                                                            {% if purchase.status == 'pending' %}معلقة{% else %}متأخرة{% endif %}
+                                                        </span>
+                                                    </td>
+                                                    <td class="no-print">
+                                                        <button class="btn btn-sm btn-success" onclick="markAsPaid('purchase', {{ purchase.id }})">
+                                                            <i class="fas fa-check"></i> دفع
+                                                        </button>
+                                                        <button class="btn btn-sm btn-warning" onclick="markAsOverdue('purchase', {{ purchase.id }})">
+                                                            <i class="fas fa-clock"></i> متأخرة
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- المدفوعات -->
+                                <div class="tab-pane fade" id="paid" role="tabpanel">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover mb-0">
+                                            <thead class="table-primary">
+                                                <tr>
+                                                    <th>النوع</th>
+                                                    <th>رقم الفاتورة</th>
+                                                    <th>الطرف</th>
+                                                    <th>التاريخ</th>
+                                                    <th>المبلغ</th>
+                                                    <th>طريقة الدفع</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for sale in paid_sales %}
+                                                <tr>
+                                                    <td><span class="badge bg-success">مبيعات</span></td>
+                                                    <td><strong>{{ sale.invoice_number }}</strong></td>
+                                                    <td>{{ sale.customer.name if sale.customer else 'عميل نقدي' }}</td>
+                                                    <td>{{ sale.date.strftime('%Y-%m-%d') }}</td>
+                                                    <td class="fw-bold text-success">{{ "%.2f"|format(sale.total) }} ر.س</td>
+                                                    <td>
+                                                        <span class="badge bg-info">
+                                                            {% if sale.payment_method == 'cash' %}نقدي
+                                                            {% elif sale.payment_method == 'credit' %}آجل
+                                                            {% else %}{{ sale.payment_method }}{% endif %}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                                {% for purchase in paid_purchases %}
+                                                <tr>
+                                                    <td><span class="badge bg-warning">مشتريات</span></td>
+                                                    <td><strong>{{ purchase.invoice_number }}</strong></td>
+                                                    <td>{{ purchase.supplier.name }}</td>
+                                                    <td>{{ purchase.date.strftime('%Y-%m-%d') }}</td>
+                                                    <td class="fw-bold text-danger">{{ "%.2f"|format(purchase.total) }} ر.س</td>
+                                                    <td>
+                                                        <span class="badge bg-secondary">
+                                                            {% if purchase.payment_method == 'cash' %}نقدي
+                                                            {% elif purchase.payment_method == 'credit' %}آجل
+                                                            {% else %}{{ purchase.payment_method }}{% endif %}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- الآجلة -->
+                                <div class="tab-pane fade" id="credit" role="tabpanel">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover mb-0">
+                                            <thead class="table-info">
+                                                <tr>
+                                                    <th>النوع</th>
+                                                    <th>رقم الفاتورة</th>
+                                                    <th>الطرف</th>
+                                                    <th>التاريخ</th>
+                                                    <th>المبلغ</th>
+                                                    <th>الحالة</th>
+                                                    <th class="no-print">الإجراءات</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for sale in credit_sales %}
+                                                <tr>
+                                                    <td><span class="badge bg-success">مبيعات</span></td>
+                                                    <td><strong>{{ sale.invoice_number }}</strong></td>
+                                                    <td>{{ sale.customer.name if sale.customer else 'عميل نقدي' }}</td>
+                                                    <td>{{ sale.date.strftime('%Y-%m-%d') }}</td>
+                                                    <td class="fw-bold text-success">{{ "%.2f"|format(sale.total) }} ر.س</td>
+                                                    <td>
+                                                        <span class="payment-status-badge {% if sale.status == 'paid' %}paid{% elif sale.status == 'pending' %}pending{% else %}overdue{% endif %}">
+                                                            {% if sale.status == 'paid' %}مدفوعة{% elif sale.status == 'pending' %}معلقة{% else %}متأخرة{% endif %}
+                                                        </span>
+                                                    </td>
+                                                    <td class="no-print">
+                                                        {% if sale.status != 'paid' %}
+                                                        <button class="btn btn-sm btn-success" onclick="markAsPaid('sale', {{ sale.id }})">
+                                                            <i class="fas fa-check"></i> تحصيل
+                                                        </button>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                                {% for purchase in credit_purchases %}
+                                                <tr>
+                                                    <td><span class="badge bg-warning">مشتريات</span></td>
+                                                    <td><strong>{{ purchase.invoice_number }}</strong></td>
+                                                    <td>{{ purchase.supplier.name }}</td>
+                                                    <td>{{ purchase.date.strftime('%Y-%m-%d') }}</td>
+                                                    <td class="fw-bold text-danger">{{ "%.2f"|format(purchase.total) }} ر.س</td>
+                                                    <td>
+                                                        <span class="payment-status-badge {% if purchase.status == 'paid' %}paid{% elif purchase.status == 'pending' %}pending{% else %}overdue{% endif %}">
+                                                            {% if purchase.status == 'paid' %}مدفوعة{% elif purchase.status == 'pending' %}معلقة{% else %}متأخرة{% endif %}
+                                                        </span>
+                                                    </td>
+                                                    <td class="no-print">
+                                                        {% if purchase.status != 'paid' %}
+                                                        <button class="btn btn-sm btn-success" onclick="markAsPaid('purchase', {{ purchase.id }})">
+                                                            <i class="fas fa-check"></i> دفع
+                                                        </button>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            // وظائف إدارة المدفوعات
+            function markAsPaid(type, id) {
+                if (confirm('هل أنت متأكد من تحديد هذه الفاتورة كمدفوعة؟')) {
+                    fetch(`/mark_as_paid/${type}/${id}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('تم تحديث حالة الفاتورة بنجاح');
+                            location.reload();
+                        } else {
+                            alert('حدث خطأ: ' + (data.message || 'خطأ غير معروف'));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('حدث خطأ أثناء التحديث');
+                    });
+                }
+            }
+
+            function markAsOverdue(type, id) {
+                if (confirm('هل أنت متأكد من تحديد هذه الفاتورة كمتأخرة؟')) {
+                    fetch(`/mark_as_overdue/${type}/${id}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('تم تحديث حالة الفاتورة بنجاح');
+                            location.reload();
+                        } else {
+                            alert('حدث خطأ: ' + (data.message || 'خطأ غير معروف'));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('حدث خطأ أثناء التحديث');
+                    });
+                }
+            }
+        </script>
+    </body>
+    </html>
+    ''', sales_invoices=sales_invoices, purchase_invoices=purchase_invoices,
+         paid_sales=paid_sales, unpaid_sales=unpaid_sales, credit_sales=credit_sales,
+         paid_purchases=paid_purchases, unpaid_purchases=unpaid_purchases, credit_purchases=credit_purchases,
+         total_receivables=total_receivables, total_payables=total_payables,
+         total_paid_sales=total_paid_sales, total_paid_purchases=total_paid_purchases)
+
+# وظائف تحديث حالة المدفوعات
+@app.route('/mark_as_paid/<invoice_type>/<int:invoice_id>', methods=['POST'])
+@login_required
+def mark_as_paid(invoice_type, invoice_id):
+    try:
+        if invoice_type == 'sale':
+            invoice = SalesInvoice.query.get_or_404(invoice_id)
+        elif invoice_type == 'purchase':
+            invoice = PurchaseInvoice.query.get_or_404(invoice_id)
+        else:
+            return jsonify({'success': False, 'message': 'نوع الفاتورة غير صحيح'})
+
+        invoice.status = 'paid'
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'تم تحديث حالة الفاتورة إلى مدفوعة'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/mark_as_overdue/<invoice_type>/<int:invoice_id>', methods=['POST'])
+@login_required
+def mark_as_overdue(invoice_type, invoice_id):
+    try:
+        if invoice_type == 'sale':
+            invoice = SalesInvoice.query.get_or_404(invoice_id)
+        elif invoice_type == 'purchase':
+            invoice = PurchaseInvoice.query.get_or_404(invoice_id)
+        else:
+            return jsonify({'success': False, 'message': 'نوع الفاتورة غير صحيح'})
+
+        invoice.status = 'overdue'
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'تم تحديث حالة الفاتورة إلى متأخرة'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
     from datetime import datetime, timedelta
 
     # إحصائيات عامة
@@ -8282,6 +8814,373 @@ if __name__ == '__main__':
     # تشغيل التطبيق
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
+# تقرير المدفوعات التفصيلي
+@app.route('/payments_report')
+@login_required
+def payments_report():
+    from datetime import datetime, timedelta
+    from sqlalchemy import func
+
+    # جلب البيانات
+    sales_invoices = SalesInvoice.query.order_by(SalesInvoice.date.desc()).all()
+    purchase_invoices = PurchaseInvoice.query.order_by(PurchaseInvoice.date.desc()).all()
+
+    # تصنيف حسب الحالة
+    paid_sales = [s for s in sales_invoices if s.status == 'paid']
+    pending_sales = [s for s in sales_invoices if s.status == 'pending']
+    overdue_sales = [s for s in sales_invoices if s.status == 'overdue']
+    credit_sales = [s for s in sales_invoices if s.payment_method == 'credit']
+
+    paid_purchases = [p for p in purchase_invoices if p.status == 'paid']
+    pending_purchases = [p for p in purchase_invoices if p.status == 'pending']
+    overdue_purchases = [p for p in purchase_invoices if p.status == 'overdue']
+    credit_purchases = [p for p in purchase_invoices if p.payment_method == 'credit']
+
+    # حساب الإجماليات
+    total_receivables = sum(s.total for s in pending_sales + overdue_sales)
+    total_payables = sum(p.total for p in pending_purchases + overdue_purchases)
+    total_paid_sales = sum(s.total for s in paid_sales)
+    total_paid_purchases = sum(p.total for p in paid_purchases)
+    total_overdue_sales = sum(s.total for s in overdue_sales)
+    total_overdue_purchases = sum(p.total for p in overdue_purchases)
+
+    # إحصائيات طرق الدفع
+    payment_methods_sales = {}
+    payment_methods_purchases = {}
+
+    for sale in sales_invoices:
+        method = sale.payment_method
+        if method not in payment_methods_sales:
+            payment_methods_sales[method] = {'count': 0, 'total': 0}
+        payment_methods_sales[method]['count'] += 1
+        payment_methods_sales[method]['total'] += sale.total
+
+    for purchase in purchase_invoices:
+        method = purchase.payment_method
+        if method not in payment_methods_purchases:
+            payment_methods_purchases[method] = {'count': 0, 'total': 0}
+        payment_methods_purchases[method]['count'] += 1
+        payment_methods_purchases[method]['total'] += purchase.total
+
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>تقرير المدفوعات التفصيلي - نظام المحاسبة</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+            body {
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+            .navbar {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            }
+            .stat-card {
+                background: white;
+                border-radius: 20px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                transition: all 0.3s ease;
+                border: none;
+                overflow: hidden;
+            }
+            .stat-card:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+            }
+            .chart-container {
+                position: relative;
+                height: 400px;
+                margin: 20px 0;
+            }
+            @media print {
+                .no-print { display: none !important; }
+                body { background: white !important; }
+                .stat-card { box-shadow: none !important; border: 1px solid #ddd !important; }
+            }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand-lg navbar-dark no-print">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-calculator me-2"></i>نظام المحاسبة الاحترافي
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <button class="btn btn-light me-2" onclick="window.print()">
+                        <i class="fas fa-print me-1"></i>طباعة
+                    </button>
+                    <a href="{{ url_for('export_pdf', report_type='payments') }}" class="btn btn-danger me-2">
+                        <i class="fas fa-file-pdf me-1"></i>PDF
+                    </a>
+                    <a href="{{ url_for('export_excel', report_type='payments') }}" class="btn btn-success me-2">
+                        <i class="fas fa-file-excel me-1"></i>Excel
+                    </a>
+                    <a class="nav-link" href="{{ url_for('reports') }}">
+                        <i class="fas fa-arrow-right me-1"></i>رجوع للتقارير
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <div class="text-center mb-5">
+                <h1 class="display-4 fw-bold text-primary">
+                    <i class="fas fa-credit-card me-3"></i>تقرير المدفوعات التفصيلي
+                </h1>
+                <p class="lead text-muted">تحليل شامل للمدفوعات والمستحقات والديون</p>
+            </div>
+
+            <!-- الإحصائيات الرئيسية -->
+            <div class="row g-4 mb-5">
+                <div class="col-md-2">
+                    <div class="stat-card text-center p-3">
+                        <div class="text-success mb-2">
+                            <i class="fas fa-arrow-down fa-2x"></i>
+                        </div>
+                        <h4 class="fw-bold text-success">{{ "%.0f"|format(total_receivables) }}</h4>
+                        <p class="text-muted mb-0 small">المستحقات لنا (ر.س)</p>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="stat-card text-center p-3">
+                        <div class="text-danger mb-2">
+                            <i class="fas fa-arrow-up fa-2x"></i>
+                        </div>
+                        <h4 class="fw-bold text-danger">{{ "%.0f"|format(total_payables) }}</h4>
+                        <p class="text-muted mb-0 small">المستحقات علينا (ر.س)</p>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="stat-card text-center p-3">
+                        <div class="text-primary mb-2">
+                            <i class="fas fa-check-circle fa-2x"></i>
+                        </div>
+                        <h4 class="fw-bold text-primary">{{ "%.0f"|format(total_paid_sales) }}</h4>
+                        <p class="text-muted mb-0 small">مبيعات مدفوعة (ر.س)</p>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="stat-card text-center p-3">
+                        <div class="text-warning mb-2">
+                            <i class="fas fa-exclamation-triangle fa-2x"></i>
+                        </div>
+                        <h4 class="fw-bold text-warning">{{ "%.0f"|format(total_overdue_sales) }}</h4>
+                        <p class="text-muted mb-0 small">مبيعات متأخرة (ر.س)</p>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="stat-card text-center p-3">
+                        <div class="text-info mb-2">
+                            <i class="fas fa-clock fa-2x"></i>
+                        </div>
+                        <h4 class="fw-bold text-info">{{ (credit_sales|length + credit_purchases|length) }}</h4>
+                        <p class="text-muted mb-0 small">فواتير آجلة</p>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="stat-card text-center p-3">
+                        <div class="text-secondary mb-2">
+                            <i class="fas fa-balance-scale fa-2x"></i>
+                        </div>
+                        <h4 class="fw-bold text-secondary">{{ "%.0f"|format(total_receivables - total_payables) }}</h4>
+                        <p class="text-muted mb-0 small">صافي المستحقات (ر.س)</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- الرسوم البيانية -->
+            <div class="row g-4 mb-5">
+                <div class="col-md-6">
+                    <div class="stat-card p-4">
+                        <h5 class="fw-bold mb-4">
+                            <i class="fas fa-chart-pie me-2"></i>توزيع طرق الدفع - المبيعات
+                        </h5>
+                        <div class="chart-container">
+                            <canvas id="salesPaymentChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="stat-card p-4">
+                        <h5 class="fw-bold mb-4">
+                            <i class="fas fa-chart-bar me-2"></i>حالة المدفوعات
+                        </h5>
+                        <div class="chart-container">
+                            <canvas id="paymentStatusChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- جدول طرق الدفع -->
+            <div class="row mb-5">
+                <div class="col-md-6">
+                    <div class="stat-card">
+                        <div class="card-header bg-success text-white p-3">
+                            <h5 class="mb-0">
+                                <i class="fas fa-shopping-cart me-2"></i>طرق الدفع - المبيعات
+                            </h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>طريقة الدفع</th>
+                                            <th>عدد الفواتير</th>
+                                            <th>إجمالي المبلغ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for method, data in payment_methods_sales.items() %}
+                                        <tr>
+                                            <td>
+                                                <span class="badge bg-info">
+                                                    {% if method == 'cash' %}نقدي
+                                                    {% elif method == 'credit' %}آجل
+                                                    {% elif method == 'mada' %}مدى
+                                                    {% elif method == 'visa' %}فيزا
+                                                    {% elif method == 'mastercard' %}ماستركارد
+                                                    {% elif method == 'bank' %}تحويل بنكي
+                                                    {% else %}{{ method }}{% endif %}
+                                                </span>
+                                            </td>
+                                            <td><strong>{{ data.count }}</strong></td>
+                                            <td class="fw-bold text-success">{{ "%.2f"|format(data.total) }} ر.س</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="stat-card">
+                        <div class="card-header bg-warning text-white p-3">
+                            <h5 class="mb-0">
+                                <i class="fas fa-shopping-bag me-2"></i>طرق الدفع - المشتريات
+                            </h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>طريقة الدفع</th>
+                                            <th>عدد الفواتير</th>
+                                            <th>إجمالي المبلغ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for method, data in payment_methods_purchases.items() %}
+                                        <tr>
+                                            <td>
+                                                <span class="badge bg-secondary">
+                                                    {% if method == 'cash' %}نقدي
+                                                    {% elif method == 'credit' %}آجل
+                                                    {% elif method == 'mada' %}مدى
+                                                    {% elif method == 'visa' %}فيزا
+                                                    {% elif method == 'mastercard' %}ماستركارد
+                                                    {% elif method == 'bank' %}تحويل بنكي
+                                                    {% else %}{{ method }}{% endif %}
+                                                </span>
+                                            </td>
+                                            <td><strong>{{ data.count }}</strong></td>
+                                            <td class="fw-bold text-warning">{{ "%.2f"|format(data.total) }} ر.س</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            // رسم بياني لطرق الدفع - المبيعات
+            const salesPaymentCtx = document.getElementById('salesPaymentChart').getContext('2d');
+            new Chart(salesPaymentCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: [
+                        {% for method, data in payment_methods_sales.items() %}
+                        '{% if method == "cash" %}نقدي{% elif method == "credit" %}آجل{% else %}{{ method }}{% endif %}'{{ ',' if not loop.last }}
+                        {% endfor %}
+                    ],
+                    datasets: [{
+                        data: [
+                            {% for method, data in payment_methods_sales.items() %}
+                            {{ data.total }}{{ ',' if not loop.last }}
+                            {% endfor %}
+                        ],
+                        backgroundColor: [
+                            '#28a745', '#ffc107', '#007bff', '#dc3545',
+                            '#6f42c1', '#fd7e14', '#20c997', '#6c757d'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+
+            // رسم بياني لحالة المدفوعات
+            const paymentStatusCtx = document.getElementById('paymentStatusChart').getContext('2d');
+            new Chart(paymentStatusCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['مدفوعة', 'معلقة', 'متأخرة', 'آجلة'],
+                    datasets: [{
+                        label: 'المبيعات (ر.س)',
+                        data: [
+                            {{ total_paid_sales }},
+                            {{ (pending_sales|map(attribute='total')|sum) or 0 }},
+                            {{ total_overdue_sales }},
+                            {{ (credit_sales|map(attribute='total')|sum) or 0 }}
+                        ],
+                        backgroundColor: '#28a745'
+                    }, {
+                        label: 'المشتريات (ر.س)',
+                        data: [
+                            {{ total_paid_purchases }},
+                            {{ (pending_purchases|map(attribute='total')|sum) or 0 }},
+                            {{ total_overdue_purchases }},
+                            {{ (credit_purchases|map(attribute='total')|sum) or 0 }}
+                        ],
+                        backgroundColor: '#ffc107'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        </script>
+    </body>
+    </html>
+    ''', sales_invoices=sales_invoices, purchase_invoices=purchase_invoices,
+         paid_sales=paid_sales, pending_sales=pending_sales, overdue_sales=overdue_sales, credit_sales=credit_sales,
+         paid_purchases=paid_purchases, pending_purchases=pending_purchases, overdue_purchases=overdue_purchases, credit_purchases=credit_purchases,
+         total_receivables=total_receivables, total_payables=total_payables,
+         total_paid_sales=total_paid_sales, total_paid_purchases=total_paid_purchases,
+         total_overdue_sales=total_overdue_sales, total_overdue_purchases=total_overdue_purchases,
+         payment_methods_sales=payment_methods_sales, payment_methods_purchases=payment_methods_purchases)
 
 # للنشر على Render
 init_db()
