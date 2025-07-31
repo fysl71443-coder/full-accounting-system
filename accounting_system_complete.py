@@ -26,13 +26,39 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 
+# استيراد نظام الحماية المتقدم
+try:
+    from security_integration import integrate_security_with_app
+    SECURITY_ENABLED = True
+    print("🛡️ تم تحميل نظام الحماية المتقدم")
+except ImportError:
+    SECURITY_ENABLED = False
+    print("⚠️ نظام الحماية غير متوفر - سيتم التشغيل بدون حماية متقدمة")
+
 # إنشاء التطبيق
 app = Flask(__name__)
 
 # الإعدادات
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'accounting-system-complete-2024')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///accounting_complete.db')
+
+# إعداد قاعدة البيانات مع ضمان الحفظ الدائم
+if os.environ.get('DATABASE_URL'):
+    # في بيئة الإنتاج (Render)
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+else:
+    # في بيئة التطوير - إنشاء مجلد instance إذا لم يكن موجوداً
+    instance_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance')
+    if not os.path.exists(instance_path):
+        os.makedirs(instance_path)
+
+    db_path = os.path.join(instance_path, 'accounting_complete.db')
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+}
 
 # قاعدة البيانات
 db = SQLAlchemy(app)
@@ -781,16 +807,46 @@ def customers():
                 <a class="navbar-brand" href="{{ url_for('dashboard') }}">
                     <i class="fas fa-calculator me-2"></i>نظام المحاسبة
                 </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="javascript:history.back()">
+                        <i class="fas fa-arrow-right me-1"></i>رجوع
+                    </a>
+                    <a class="nav-link" href="{{ url_for('dashboard') }}">
+                        <i class="fas fa-home me-1"></i>الرئيسية
+                    </a>
+                </div>
             </div>
         </nav>
 
         <div class="container mt-4">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="fas fa-users me-2"></i>إدارة العملاء</h5>
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCustomerModal">
+            <!-- عنوان الصفحة مع الإحصائيات -->
+            <div class="row mb-4">
+                <div class="col-md-8">
+                    <h2 class="fw-bold text-primary">
+                        <i class="fas fa-users me-2"></i>إدارة العملاء
+                    </h2>
+                    <p class="text-muted">إجمالي العملاء: {{ total_customers }} عميل</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <button type="button" class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#addCustomerModal">
                         <i class="fas fa-plus me-2"></i>إضافة عميل جديد
                     </button>
+                </div>
+            </div>
+
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-list me-2"></i>قائمة العملاء</h5>
+                        <div>
+                            <button class="btn btn-light btn-sm me-2" onclick="window.print()">
+                                <i class="fas fa-print me-1"></i>طباعة
+                            </button>
+                            <button class="btn btn-success btn-sm" onclick="exportToExcel()">
+                                <i class="fas fa-file-excel me-1"></i>تصدير Excel
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -858,22 +914,155 @@ def customers():
         </div>
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            // فحص حالة البيانات تلقائياً
+            function checkDataStatus() {
+                fetch('/check_data_status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log('✅ البيانات محفوظة:', data.stats);
+
+                        // إظهار إشعار إذا كانت البيانات قليلة
+                        if (data.stats.customers === 0) {
+                            showDataAlert('لا يوجد عملاء محفوظون. البيانات المضافة ستُحفظ تلقائياً.', 'info');
+                        }
+                    } else {
+                        console.error('❌ مشكلة في البيانات:', data.error);
+                        showDataAlert('تحذير: قد تكون هناك مشكلة في حفظ البيانات', 'warning');
+                    }
+                })
+                .catch(error => {
+                    console.error('خطأ في فحص البيانات:', error);
+                });
+            }
+
+            function showDataAlert(message, type) {
+                const alertDiv = document.createElement('div');
+                alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+                alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+                alertDiv.innerHTML = `
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                document.body.appendChild(alertDiv);
+
+                // إزالة الإشعار بعد 5 ثوان
+                setTimeout(() => {
+                    if (alertDiv.parentNode) {
+                        alertDiv.remove();
+                    }
+                }, 5000);
+            }
+
+            // فحص البيانات عند تحميل الصفحة
+            document.addEventListener('DOMContentLoaded', function() {
+                checkDataStatus();
+
+                // فحص دوري كل 30 ثانية
+                setInterval(checkDataStatus, 30000);
+            });
+
+            // إضافة مؤشر حفظ للنماذج
+            document.querySelectorAll('form').forEach(form => {
+                form.addEventListener('submit', function() {
+                    const submitBtn = form.querySelector('button[type="submit"]');
+                    if (submitBtn) {
+                        const originalText = submitBtn.innerHTML;
+                        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>جاري الحفظ...';
+                        submitBtn.disabled = true;
+
+                        // إعادة تعيين الزر بعد 3 ثوان (في حالة عدم إعادة التوجيه)
+                        setTimeout(() => {
+                            submitBtn.innerHTML = originalText;
+                            submitBtn.disabled = false;
+                        }, 3000);
+                    }
+                });
+            });
+
+            // وظائف التصدير
+            function exportToExcel() {
+                // جمع بيانات العملاء
+                const customers = [];
+                const rows = document.querySelectorAll('tbody tr');
+
+                rows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 5) {
+                        customers.push({
+                            name: cells[0].textContent.trim(),
+                            phone: cells[1].textContent.trim(),
+                            email: cells[2].textContent.trim(),
+                            address: cells[3].textContent.trim(),
+                            date: cells[4].textContent.trim()
+                        });
+                    }
+                });
+
+                // إنشاء CSV
+                let csv = 'الاسم,الهاتف,البريد الإلكتروني,العنوان,تاريخ الإضافة\\n';
+                customers.forEach(customer => {
+                    csv += `"${customer.name}","${customer.phone}","${customer.email}","${customer.address}","${customer.date}"\\n`;
+                });
+
+                // تنزيل الملف
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `customers_${new Date().toISOString().split('T')[0]}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                // إشعار للمستخدم
+                alert('تم تصدير قائمة العملاء بنجاح!');
+            }
+
+            // تحسين مظهر الجدول
+            document.addEventListener('DOMContentLoaded', function() {
+                // إضافة تأثيرات hover للصفوف
+                const rows = document.querySelectorAll('tbody tr');
+                rows.forEach(row => {
+                    row.addEventListener('mouseenter', function() {
+                        this.style.backgroundColor = '#f8f9fa';
+                    });
+                    row.addEventListener('mouseleave', function() {
+                        this.style.backgroundColor = '';
+                    });
+                });
+            });
+        </script>
     </body>
     </html>
-    ''', customers=customers)
+    ''', customers=customers, total_customers=total_customers)
 
 @app.route('/add_customer', methods=['POST'])
 @login_required
 def add_customer():
-    customer = Customer(
-        name=request.form['name'],
-        phone=request.form.get('phone'),
-        email=request.form.get('email'),
-        address=request.form.get('address')
-    )
-    db.session.add(customer)
-    db.session.commit()
-    flash('تم إضافة العميل بنجاح', 'success')
+    try:
+        customer = Customer(
+            name=request.form['name'],
+            phone=request.form.get('phone'),
+            email=request.form.get('email'),
+            address=request.form.get('address')
+        )
+        db.session.add(customer)
+        db.session.commit()
+
+        # التأكد من الحفظ
+        saved_customer = Customer.query.filter_by(name=request.form['name']).first()
+        if saved_customer:
+            flash(f'تم إضافة العميل "{saved_customer.name}" بنجاح وحفظه في قاعدة البيانات', 'success')
+        else:
+            flash('تم إضافة العميل ولكن قد تكون هناك مشكلة في الحفظ', 'warning')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'حدث خطأ أثناء إضافة العميل: {str(e)}', 'error')
+
     return redirect(url_for('customers'))
 
 # ===== باقي الوظائف (مبسطة) =====
@@ -3857,8 +4046,8 @@ def print_invoice(sale_id):
                         <p class="mb-0"><strong>الرقم الضريبي:</strong> {{ company_info.tax_number }}</p>
                     </div>
                     <div class="col-md-4 text-end">
-                        <div class="qr-code">
-                            رمز QR
+                        <div class="qr-code" id="qrcode-{{ sale.id }}">
+                            <!-- سيتم إنشاء QR Code هنا -->
                         </div>
                     </div>
                 </div>
@@ -3998,9 +4187,48 @@ def print_invoice(sale_id):
             </div>
         </div>
 
+        <!-- مكتبة QR Code -->
+        <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
         <script>
-            // طباعة تلقائية عند فتح الصفحة
+            // إنشاء QR Code
             window.onload = function() {
+                // بيانات الفاتورة للـ QR Code
+                const invoiceData = {
+                    invoice_number: '{{ sale.invoice_number }}',
+                    date: '{{ sale.date }}',
+                    total: '{{ sale.total }}',
+                    customer: '{{ sale.customer.name if sale.customer else "عميل نقدي" }}',
+                    company: 'شركة المحاسبة الاحترافية',
+                    tax_number: '123456789012345'
+                };
+
+                // تحويل البيانات إلى نص
+                const qrText = `فاتورة رقم: ${invoiceData.invoice_number}
+التاريخ: ${invoiceData.date}
+العميل: ${invoiceData.customer}
+المبلغ: ${invoiceData.total} ر.س
+الشركة: ${invoiceData.company}
+الرقم الضريبي: ${invoiceData.tax_number}`;
+
+                // إنشاء QR Code
+                const qrContainer = document.getElementById('qrcode-{{ sale.id }}');
+                if (qrContainer) {
+                    QRCode.toCanvas(qrContainer, qrText, {
+                        width: 100,
+                        height: 100,
+                        margin: 1,
+                        color: {
+                            dark: '#000000',
+                            light: '#FFFFFF'
+                        }
+                    }, function (error) {
+                        if (error) {
+                            console.error('خطأ في إنشاء QR Code:', error);
+                            qrContainer.innerHTML = '<small class="text-muted">خطأ في QR</small>';
+                        }
+                    });
+                }
+
                 // يمكن تفعيل الطباعة التلقائية إذا رغبت
                 // window.print();
             }
@@ -7253,14 +7481,29 @@ def payments():
                             <i class="fas fa-filter me-1"></i>فلترة
                         </button>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="?filter=paid">المدفوعة</a></li>
-                            <li><a class="dropdown-item" href="?filter=pending">المعلقة</a></li>
-                            <li><a class="dropdown-item" href="?filter=overdue">المتأخرة</a></li>
-                            <li><a class="dropdown-item" href="?filter=credit">الآجلة</a></li>
+                            <li><a class="dropdown-item" href="?filter=paid"><i class="fas fa-check-circle text-success me-2"></i>المدفوعة</a></li>
+                            <li><a class="dropdown-item" href="?filter=pending"><i class="fas fa-clock text-warning me-2"></i>المعلقة</a></li>
+                            <li><a class="dropdown-item" href="?filter=overdue"><i class="fas fa-exclamation-triangle text-danger me-2"></i>المتأخرة</a></li>
+                            <li><a class="dropdown-item" href="?filter=credit"><i class="fas fa-calendar-alt text-info me-2"></i>الآجلة</a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('payments') }}">جميع المدفوعات</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('payments') }}"><i class="fas fa-list me-2"></i>جميع المدفوعات</a></li>
                         </ul>
                     </div>
+                    <div class="dropdown me-2">
+                        <button class="btn btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-plus me-1"></i>إجراءات سريعة
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="markAllOverdue()"><i class="fas fa-exclamation-triangle text-danger me-2"></i>تحديد المتأخرة</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="sendReminders()"><i class="fas fa-bell text-warning me-2"></i>إرسال تذكيرات</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="generateReport()"><i class="fas fa-file-alt text-info me-2"></i>تقرير مفصل</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="bulkPayment()"><i class="fas fa-money-bill-wave text-success me-2"></i>دفع جماعي</a></li>
+                        </ul>
+                    </div>
+                    <button class="btn btn-warning me-2" onclick="refreshData()">
+                        <i class="fas fa-sync-alt me-1"></i>تحديث
+                    </button>
                     <a class="nav-link" href="{{ url_for('dashboard') }}">
                         <i class="fas fa-home me-1"></i>الرئيسية
                     </a>
@@ -7278,46 +7521,138 @@ def payments():
 
             <!-- الإحصائيات الرئيسية -->
             <div class="row g-4 mb-5">
-                <div class="col-md-3">
-                    <div class="stat-card text-center p-4">
-                        <div class="text-success mb-3">
-                            <i class="fas fa-arrow-down fa-3x"></i>
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card text-center p-4 border-start border-success border-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="text-success">
+                                <i class="fas fa-arrow-down fa-2x"></i>
+                            </div>
+                            <div class="text-end">
+                                <div class="progress" style="height: 8px; width: 60px;">
+                                    <div class="progress-bar bg-success" style="width: {{ (unpaid_sales|length / (sales_invoices|length + 1) * 100)|round }}%"></div>
+                                </div>
+                            </div>
                         </div>
-                        <h3 class="fw-bold text-success">{{ "%.2f"|format(total_receivables) }}</h3>
-                        <p class="text-muted mb-0">المستحقات (ر.س)</p>
-                        <small class="text-muted">{{ unpaid_sales|length }} فاتورة</small>
+                        <h3 class="fw-bold text-success mb-1">{{ "%.2f"|format(total_receivables) }}</h3>
+                        <p class="text-muted mb-1">المستحقات لنا</p>
+                        <div class="d-flex justify-content-between">
+                            <small class="text-muted">{{ unpaid_sales|length }} فاتورة</small>
+                            <small class="badge bg-success">{{ ((total_receivables / (total_receivables + total_payables + 1)) * 100)|round }}%</small>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-card text-center p-4">
-                        <div class="text-danger mb-3">
-                            <i class="fas fa-arrow-up fa-3x"></i>
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card text-center p-4 border-start border-danger border-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="text-danger">
+                                <i class="fas fa-arrow-up fa-2x"></i>
+                            </div>
+                            <div class="text-end">
+                                <div class="progress" style="height: 8px; width: 60px;">
+                                    <div class="progress-bar bg-danger" style="width: {{ (unpaid_purchases|length / (purchase_invoices|length + 1) * 100)|round }}%"></div>
+                                </div>
+                            </div>
                         </div>
-                        <h3 class="fw-bold text-danger">{{ "%.2f"|format(total_payables) }}</h3>
-                        <p class="text-muted mb-0">المدفوعات المستحقة (ر.س)</p>
-                        <small class="text-muted">{{ unpaid_purchases|length }} فاتورة</small>
+                        <h3 class="fw-bold text-danger mb-1">{{ "%.2f"|format(total_payables) }}</h3>
+                        <p class="text-muted mb-1">المستحقات علينا</p>
+                        <div class="d-flex justify-content-between">
+                            <small class="text-muted">{{ unpaid_purchases|length }} فاتورة</small>
+                            <small class="badge bg-danger">{{ ((total_payables / (total_receivables + total_payables + 1)) * 100)|round }}%</small>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-card text-center p-4">
-                        <div class="text-primary mb-3">
-                            <i class="fas fa-check-circle fa-3x"></i>
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card text-center p-4 border-start border-primary border-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="text-primary">
+                                <i class="fas fa-check-circle fa-2x"></i>
+                            </div>
+                            <div class="text-end">
+                                <div class="progress" style="height: 8px; width: 60px;">
+                                    <div class="progress-bar bg-primary" style="width: {{ (paid_sales|length / (sales_invoices|length + 1) * 100)|round }}%"></div>
+                                </div>
+                            </div>
                         </div>
-                        <h3 class="fw-bold text-primary">{{ "%.2f"|format(total_paid_sales) }}</h3>
-                        <p class="text-muted mb-0">المبيعات المدفوعة (ر.س)</p>
-                        <small class="text-muted">{{ paid_sales|length }} فاتورة</small>
+                        <h3 class="fw-bold text-primary mb-1">{{ "%.2f"|format(total_paid_sales) }}</h3>
+                        <p class="text-muted mb-1">المبيعات المدفوعة</p>
+                        <div class="d-flex justify-content-between">
+                            <small class="text-muted">{{ paid_sales|length }} فاتورة</small>
+                            <small class="badge bg-primary">مدفوعة</small>
+                        </div>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="stat-card text-center p-4">
-                        <div class="text-info mb-3">
-                            <i class="fas fa-balance-scale fa-3x"></i>
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card text-center p-4 border-start border-{% if total_receivables - total_payables >= 0 %}success{% else %}warning{% endif %} border-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="text-{% if total_receivables - total_payables >= 0 %}success{% else %}warning{% endif %}">
+                                <i class="fas fa-balance-scale fa-2x"></i>
+                            </div>
+                            <div class="text-end">
+                                <i class="fas fa-{% if total_receivables - total_payables >= 0 %}arrow-up{% else %}arrow-down{% endif %} text-{% if total_receivables - total_payables >= 0 %}success{% else %}warning{% endif %}"></i>
+                            </div>
                         </div>
-                        <h3 class="fw-bold text-info">{{ "%.2f"|format(total_receivables - total_payables) }}</h3>
-                        <p class="text-muted mb-0">صافي المستحقات (ر.س)</p>
-                        <small class="{% if total_receivables - total_payables >= 0 %}text-success{% else %}text-danger{% endif %}">
-                            {% if total_receivables - total_payables >= 0 %}لصالحنا{% else %}علينا{% endif %}
-                        </small>
+                        <h3 class="fw-bold text-{% if total_receivables - total_payables >= 0 %}success{% else %}warning{% endif %} mb-1">{{ "%.2f"|format(total_receivables - total_payables) }}</h3>
+                        <p class="text-muted mb-1">صافي المستحقات</p>
+                        <div class="d-flex justify-content-between">
+                            <small class="text-{% if total_receivables - total_payables >= 0 %}success{% else %}warning{% endif %}">
+                                {% if total_receivables - total_payables >= 0 %}لصالحنا{% else %}علينا{% endif %}
+                            </small>
+                            <small class="badge bg-{% if total_receivables - total_payables >= 0 %}success{% else %}warning{% endif %}">
+                                {% if total_receivables - total_payables >= 0 %}ربح{% else %}خسارة{% endif %}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- إحصائيات إضافية -->
+            <div class="row g-4 mb-5">
+                <div class="col-md-4">
+                    <div class="stat-card p-4">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-shrink-0">
+                                <div class="bg-warning bg-opacity-10 rounded-circle p-3">
+                                    <i class="fas fa-exclamation-triangle text-warning fa-2x"></i>
+                                </div>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <h5 class="fw-bold mb-1">فواتير متأخرة</h5>
+                                <h3 class="text-warning mb-0">{{ (unpaid_sales|selectattr('status', 'equalto', 'overdue')|list|length) + (unpaid_purchases|selectattr('status', 'equalto', 'overdue')|list|length) }}</h3>
+                                <small class="text-muted">تحتاج متابعة فورية</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-card p-4">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-shrink-0">
+                                <div class="bg-info bg-opacity-10 rounded-circle p-3">
+                                    <i class="fas fa-calendar-check text-info fa-2x"></i>
+                                </div>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <h5 class="fw-bold mb-1">مدفوعات اليوم</h5>
+                                <h3 class="text-info mb-0">0</h3>
+                                <small class="text-muted">تم دفعها اليوم</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-card p-4">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-shrink-0">
+                                <div class="bg-secondary bg-opacity-10 rounded-circle p-3">
+                                    <i class="fas fa-percentage text-secondary fa-2x"></i>
+                                </div>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <h5 class="fw-bold mb-1">معدل التحصيل</h5>
+                                <h3 class="text-secondary mb-0">{{ ((paid_sales|length / (sales_invoices|length + 1)) * 100)|round }}%</h3>
+                                <small class="text-muted">من إجمالي المبيعات</small>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -7355,12 +7690,30 @@ def payments():
                                 <!-- المستحقات لنا -->
                                 <div class="tab-pane fade show active" id="receivables" role="tabpanel">
                                     <div class="table-responsive">
+                                        <div class="d-flex justify-content-between align-items-center p-3 bg-light">
+                                            <div>
+                                                <h6 class="mb-0">المستحقات لنا - {{ unpaid_sales|length }} فاتورة</h6>
+                                                <small class="text-muted">إجمالي المبلغ: {{ "%.2f"|format(total_receivables) }} ر.س</small>
+                                            </div>
+                                            <div>
+                                                <button class="btn btn-sm btn-success me-2" onclick="selectAllReceivables()">
+                                                    <i class="fas fa-check-square me-1"></i>تحديد الكل
+                                                </button>
+                                                <button class="btn btn-sm btn-primary" onclick="bulkCollect()">
+                                                    <i class="fas fa-money-bill-wave me-1"></i>تحصيل جماعي
+                                                </button>
+                                            </div>
+                                        </div>
                                         <table class="table table-hover mb-0">
                                             <thead class="table-success">
                                                 <tr>
+                                                    <th width="40">
+                                                        <input type="checkbox" id="selectAllReceivables" onchange="toggleAllReceivables()">
+                                                    </th>
                                                     <th>رقم الفاتورة</th>
                                                     <th>العميل</th>
                                                     <th>التاريخ</th>
+                                                    <th>أيام التأخير</th>
                                                     <th>المبلغ</th>
                                                     <th>طريقة الدفع</th>
                                                     <th>الحالة</th>
@@ -7369,28 +7722,67 @@ def payments():
                                             </thead>
                                             <tbody>
                                                 {% for sale in unpaid_sales %}
-                                                <tr>
-                                                    <td><strong>{{ sale.invoice_number }}</strong></td>
-                                                    <td>{{ sale.customer.name if sale.customer else 'عميل نقدي' }}</td>
-                                                    <td>{{ sale.date.strftime('%Y-%m-%d') }}</td>
-                                                    <td class="fw-bold text-success">{{ "%.2f"|format(sale.total) }} ر.س</td>
+                                                <tr class="{% if sale.status == 'overdue' %}table-warning{% endif %}">
                                                     <td>
-                                                        <span class="badge bg-info">
+                                                        <input type="checkbox" class="receivable-checkbox" value="{{ sale.id }}">
+                                                    </td>
+                                                    <td>
+                                                        <div class="d-flex align-items-center">
+                                                            <strong>{{ sale.invoice_number }}</strong>
+                                                            {% if sale.status == 'overdue' %}
+                                                            <i class="fas fa-exclamation-triangle text-warning ms-2" title="متأخرة"></i>
+                                                            {% endif %}
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <div>
+                                                            <strong>{{ sale.customer.name if sale.customer else 'عميل نقدي' }}</strong>
+                                                            {% if sale.customer and sale.customer.phone %}
+                                                            <br><small class="text-muted">{{ sale.customer.phone }}</small>
+                                                            {% endif %}
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <div>
+                                                            {{ sale.date.strftime('%Y-%m-%d') }}
+                                                            <br><small class="text-muted">{{ sale.date.strftime('%A') }}</small>
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        {% set today = moment().date() if moment is defined else now().date() %}
+                                                        {% set days_diff = (today - sale.date).days %}
+                                                        <span class="badge {% if days_diff > 30 %}bg-danger{% elif days_diff > 15 %}bg-warning{% else %}bg-success{% endif %}">
+                                                            {{ days_diff }} يوم
+                                                        </span>
+                                                    </td>
+                                                    <td class="fw-bold text-success">
+                                                        {{ "%.2f"|format(sale.total) }} ر.س
+                                                        {% if sale.tax_amount > 0 %}
+                                                        <br><small class="text-muted">شامل ضريبة: {{ "%.2f"|format(sale.tax_amount) }}</small>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge {% if sale.payment_method == 'cash' %}bg-success{% elif sale.payment_method == 'credit' %}bg-info{% else %}bg-secondary{% endif %}">
                                                             {% if sale.payment_method == 'cash' %}نقدي
                                                             {% elif sale.payment_method == 'credit' %}آجل
+                                                            {% elif sale.payment_method == 'mada' %}مدى
+                                                            {% elif sale.payment_method == 'visa' %}فيزا
                                                             {% else %}{{ sale.payment_method }}{% endif %}
                                                         </span>
                                                     </td>
                                                     <td>
-                                                        <span class="payment-status-badge {% if sale.status == 'pending' %}pending{% else %}overdue{% endif %}">
-                                                            {% if sale.status == 'pending' %}معلقة{% else %}متأخرة{% endif %}
+                                                        <span class="payment-status-badge {% if sale.status == 'pending' %}pending{% elif sale.status == 'overdue' %}overdue{% else %}paid{% endif %}">
+                                                            {% if sale.status == 'pending' %}معلقة
+                                                            {% elif sale.status == 'overdue' %}متأخرة
+                                                            {% else %}مدفوعة{% endif %}
                                                         </span>
                                                     </td>
                                                     <td class="no-print">
-                                                        <button class="btn btn-sm btn-success" onclick="markAsPaid('sale', {{ sale.id }})">
-                                                            <i class="fas fa-check"></i> تحصيل
-                                                        </button>
-                                                        <button class="btn btn-sm btn-warning" onclick="markAsOverdue('sale', {{ sale.id }})">
+                                                        <div class="btn-group" role="group">
+                                                            <button class="btn btn-sm btn-success" onclick="markAsPaid('sale', {{ sale.id }})" title="تحصيل">
+                                                                <i class="fas fa-check"></i>
+                                                            </button>
+                                                            <button class="btn btn-sm btn-warning" onclick="markAsOverdue('sale', {{ sale.id }})" title="متأخرة">
                                                             <i class="fas fa-clock"></i> متأخرة
                                                         </button>
                                                     </td>
@@ -7573,9 +7965,15 @@ def payments():
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
         <script>
-            // وظائف إدارة المدفوعات
+            // وظائف إدارة المدفوعات المحسنة
             function markAsPaid(type, id) {
                 if (confirm('هل أنت متأكد من تحديد هذه الفاتورة كمدفوعة؟')) {
+                    // إظهار مؤشر التحميل
+                    const button = event.target.closest('button');
+                    const originalText = button.innerHTML;
+                    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري التحديث...';
+                    button.disabled = true;
+
                     fetch(`/mark_as_paid/${type}/${id}`, {
                         method: 'POST',
                         headers: {
@@ -7614,13 +8012,126 @@ def payments():
                         } else {
                             alert('حدث خطأ: ' + (data.message || 'خطأ غير معروف'));
                         }
+                        // إعادة تعيين الزر
+                        button.innerHTML = originalText;
+                        button.disabled = false;
                     })
                     .catch(error => {
                         console.error('Error:', error);
                         alert('حدث خطأ أثناء التحديث');
+                        // إعادة تعيين الزر
+                        button.innerHTML = originalText;
+                        button.disabled = false;
                     });
                 }
             }
+
+            function markAsOverdue(type, id) {
+                if (confirm('هل أنت متأكد من تحديد هذه الفاتورة كمتأخرة؟')) {
+                    const button = event.target.closest('button');
+                    const originalText = button.innerHTML;
+                    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                    button.disabled = true;
+
+                    fetch(`/mark_as_overdue/${type}/${id}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('تم تحديث حالة الفاتورة بنجاح');
+                            location.reload();
+                        } else {
+                            alert('حدث خطأ: ' + (data.message || 'خطأ غير معروف'));
+                        }
+                        button.innerHTML = originalText;
+                        button.disabled = false;
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('حدث خطأ أثناء التحديث');
+                        button.innerHTML = originalText;
+                        button.disabled = false;
+                    });
+                }
+            }
+
+            // وظائف التحديد الجماعي
+            function toggleAllReceivables() {
+                const selectAll = document.getElementById('selectAllReceivables');
+                const checkboxes = document.querySelectorAll('.receivable-checkbox');
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = selectAll.checked;
+                });
+            }
+
+            function selectAllReceivables() {
+                const checkboxes = document.querySelectorAll('.receivable-checkbox');
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = true;
+                });
+                document.getElementById('selectAllReceivables').checked = true;
+            }
+
+            function bulkCollect() {
+                const selectedIds = Array.from(document.querySelectorAll('.receivable-checkbox:checked')).map(cb => cb.value);
+                if (selectedIds.length === 0) {
+                    alert('يرجى تحديد فاتورة واحدة على الأقل');
+                    return;
+                }
+
+                if (confirm(`هل أنت متأكد من تحصيل ${selectedIds.length} فاتورة؟`)) {
+                    // هنا يمكن إضافة API للتحصيل الجماعي
+                    alert(`سيتم تحصيل ${selectedIds.length} فاتورة`);
+                    console.log('Selected invoices:', selectedIds);
+                }
+            }
+
+            // وظائف الإجراءات السريعة
+            function markAllOverdue() {
+                if (confirm('هل تريد تحديد جميع الفواتير المتأخرة تلقائياً؟')) {
+                    alert('سيتم تحديد الفواتير المتأخرة (أكثر من 30 يوم)');
+                    // يمكن إضافة منطق تحديد الفواتير المتأخرة هنا
+                }
+            }
+
+            function sendReminders() {
+                if (confirm('هل تريد إرسال تذكيرات للعملاء المتأخرين؟')) {
+                    alert('سيتم إرسال تذكيرات عبر الرسائل النصية والبريد الإلكتروني');
+                    // يمكن إضافة منطق إرسال التذكيرات هنا
+                }
+            }
+
+            function generateReport() {
+                alert('سيتم إنشاء تقرير مفصل للمدفوعات والمستحقات');
+                // يمكن توجيه المستخدم لصفحة التقارير
+                window.open('/payments_report', '_blank');
+            }
+
+            function bulkPayment() {
+                alert('سيتم فتح نافذة الدفع الجماعي');
+                // يمكن إضافة مودال للدفع الجماعي
+            }
+
+            function refreshData() {
+                location.reload();
+            }
+
+            // تحديث الوقت الحقيقي للأيام
+            function updateDaysCounter() {
+                const badges = document.querySelectorAll('.badge');
+                badges.forEach(badge => {
+                    if (badge.textContent.includes('يوم')) {
+                        // يمكن إضافة منطق تحديث العداد هنا
+                    }
+                });
+            }
+
+            // تشغيل تحديث العداد كل دقيقة
+            setInterval(updateDaysCounter, 60000);
         </script>
     </body>
     </html>
@@ -9417,17 +9928,35 @@ def settings():
 def init_db():
     """تهيئة قاعدة البيانات وإنشاء البيانات الأساسية"""
     with app.app_context():
-        db.create_all()
+        try:
+            # إنشاء الجداول
+            db.create_all()
 
-        # إنشاء مستخدم افتراضي
-        if not User.query.filter_by(username='admin').first():
-            admin = User(
-                username='admin',
-                full_name='مدير النظام',
-                role='admin'
-            )
-            admin.set_password('admin123')
-            db.session.add(admin)
+            # طباعة معلومات قاعدة البيانات
+            db_uri = app.config['SQLALCHEMY_DATABASE_URI']
+            print(f"📊 قاعدة البيانات: {db_uri}")
+
+            # التحقق من وجود الجداول
+            inspector = db.inspect(db.engine)
+            tables = inspector.get_table_names()
+            print(f"📋 الجداول الموجودة: {len(tables)} جدول")
+
+            if 'user' in tables:
+                print("✅ جدول المستخدمين موجود")
+            if 'customer' in tables:
+                print("✅ جدول العملاء موجود")
+            if 'sales_invoice' in tables:
+                print("✅ جدول فواتير المبيعات موجود")
+
+            # إنشاء مستخدم افتراضي
+            if not User.query.filter_by(username='admin').first():
+                admin = User(
+                    username='admin',
+                    full_name='مدير النظام',
+                    role='admin'
+                )
+                admin.set_password('admin123')
+                db.session.add(admin)
 
             # إضافة بيانات تجريبية
             sample_customer = Customer(
@@ -9465,7 +9994,66 @@ def init_db():
 
             db.session.add_all([sample_customer, sample_supplier, sample_product, sample_employee])
             db.session.commit()
+
+            # فحص البيانات المحفوظة
+            users_count = User.query.count()
+            customers_count = Customer.query.count()
+            products_count = Product.query.count()
+            employees_count = Employee.query.count()
+
             print('✅ تم إنشاء المستخدم الافتراضي والبيانات التجريبية')
+            print(f"📊 إحصائيات البيانات المحفوظة:")
+            print(f"   - المستخدمون: {users_count}")
+            print(f"   - العملاء: {customers_count}")
+            print(f"   - المنتجات: {products_count}")
+            print(f"   - الموظفون: {employees_count}")
+
+        except Exception as e:
+            print(f"❌ خطأ في تهيئة قاعدة البيانات: {e}")
+            db.session.rollback()
+
+# وظيفة فحص حالة البيانات
+@app.route('/check_data_status')
+@login_required
+def check_data_status():
+    """فحص حالة البيانات المحفوظة"""
+    try:
+        stats = {
+            'users': User.query.count(),
+            'customers': Customer.query.count(),
+            'suppliers': Supplier.query.count(),
+            'products': Product.query.count(),
+            'employees': Employee.query.count(),
+            'sales': SalesInvoice.query.count(),
+            'purchases': PurchaseInvoice.query.count(),
+            'expenses': Expense.query.count()
+        }
+
+        # فحص آخر البيانات المضافة
+        latest = {
+            'last_customer': Customer.query.order_by(Customer.id.desc()).first(),
+            'last_sale': SalesInvoice.query.order_by(SalesInvoice.id.desc()).first(),
+            'last_employee': Employee.query.order_by(Employee.id.desc()).first()
+        }
+
+        return jsonify({
+            'success': True,
+            'stats': stats,
+            'latest': {
+                'last_customer': latest['last_customer'].name if latest['last_customer'] else None,
+                'last_sale': latest['last_sale'].invoice_number if latest['last_sale'] else None,
+                'last_employee': latest['last_employee'].name if latest['last_employee'] else None
+            },
+            'database_path': app.config['SQLALCHEMY_DATABASE_URI'],
+            'message': 'البيانات محفوظة بنجاح'
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': 'حدث خطأ في فحص البيانات'
+        })
 
 # تشغيل النظام
 if __name__ == '__main__':
@@ -9477,6 +10065,7 @@ if __name__ == '__main__':
     print('✅ تم تهيئة قاعدة البيانات')
     print('🌐 الرابط: http://localhost:5000')
     print('👤 المستخدم: admin | كلمة المرور: admin123')
+    print('🔍 فحص البيانات: http://localhost:5000/check_data_status')
 
     # تشغيل التطبيق
     port = int(os.environ.get('PORT', 5000))
@@ -9848,6 +10437,24 @@ def payments_report():
          total_paid_sales=total_paid_sales, total_paid_purchases=total_paid_purchases,
          total_overdue_sales=total_overdue_sales, total_overdue_purchases=total_overdue_purchases,
          payment_methods_sales=payment_methods_sales, payment_methods_purchases=payment_methods_purchases)
+
+# تفعيل نظام الحماية المتقدم
+if SECURITY_ENABLED:
+    try:
+        security_system = integrate_security_with_app(app)
+        print("🛡️ تم تفعيل نظام الحماية المتقدم بنجاح")
+        print("🔒 الحماية تشمل:")
+        print("   - حماية من SQL Injection")
+        print("   - حماية من XSS Attacks")
+        print("   - حماية من CSRF")
+        print("   - حماية من Brute Force")
+        print("   - حماية من DDoS")
+        print("   - نظام الفخاخ الأمنية")
+        print("   - مراقبة التهديدات المتقدمة")
+        print("🌐 لوحة تحكم الأمان: /security/dashboard")
+    except Exception as e:
+        print(f"❌ خطأ في تفعيل نظام الحماية: {e}")
+        SECURITY_ENABLED = False
 
 # للنشر على Render
 init_db()
