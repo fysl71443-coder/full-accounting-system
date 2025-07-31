@@ -44,10 +44,26 @@ def check_system():
         print(f"❌ خطأ في فحص الإصلاحات: {e}")
         return False
     
+    # اختبار الاستيرادات
+    print("\n📦 اختبار الاستيرادات...")
+    try:
+        result = subprocess.run([sys.executable, 'test_imports.py'],
+                              capture_output=True, text=True, encoding='utf-8')
+        if result.returncode == 0:
+            print("✅ اختبار الاستيرادات نجح")
+        else:
+            print("❌ اختبار الاستيرادات فشل")
+            print(result.stdout)
+            print(result.stderr)
+            return False
+    except Exception as e:
+        print(f"❌ خطأ في اختبار الاستيرادات: {e}")
+        return False
+
     # تشغيل الاختبار السريع
     print("\n⚡ تشغيل الاختبار السريع...")
     try:
-        result = subprocess.run([sys.executable, 'quick_test.py'], 
+        result = subprocess.run([sys.executable, 'quick_test.py'],
                               capture_output=True, text=True, encoding='utf-8')
         if result.returncode == 0:
             print("✅ الاختبار السريع نجح")

@@ -7235,58 +7235,7 @@ def delete_expense(expense_id):
     db.session.commit()
     return jsonify({'success': True})
 
-# ===== وظائف الطباعة والتصدير =====
-
-@app.route('/print_invoice/<int:invoice_id>')
-@login_required
-def print_invoice(invoice_id):
-    invoice = SalesInvoice.query.get_or_404(invoice_id)
-    return render_template_string('''
-    <!DOCTYPE html>
-    <html dir="rtl" lang="ar">
-    <head>
-        <meta charset="UTF-8">
-        <title>فاتورة رقم {{ invoice.invoice_number }}</title>
-        <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; }
-            .invoice-details { margin: 20px 0; }
-            .total { font-size: 18px; font-weight: bold; }
-            @media print {
-                .no-print { display: none; }
-            }
-        </style>
-    </head>
-    <body>
-        <div class="header">
-            <h1>فاتورة مبيعات</h1>
-            <h2>رقم الفاتورة: {{ invoice.invoice_number }}</h2>
-        </div>
-
-        <div class="invoice-details">
-            <p><strong>العميل:</strong> {{ invoice.customer.name if invoice.customer else 'عميل نقدي' }}</p>
-            <p><strong>التاريخ:</strong> {{ invoice.date.strftime('%Y-%m-%d') }}</p>
-            <p><strong>المبلغ الفرعي:</strong> {{ "%.2f"|format(invoice.subtotal) }} ر.س</p>
-            <p><strong>الضريبة:</strong> {{ "%.2f"|format(invoice.tax_amount) }} ر.س</p>
-            <p class="total"><strong>الإجمالي:</strong> {{ "%.2f"|format(invoice.total) }} ر.س</p>
-            {% if invoice.notes %}
-            <p><strong>ملاحظات:</strong> {{ invoice.notes }}</p>
-            {% endif %}
-        </div>
-
-        <div class="no-print">
-            <button onclick="window.print()" class="btn btn-primary">طباعة</button>
-            <button onclick="window.close()" class="btn btn-secondary">إغلاق</button>
-        </div>
-
-        <script>
-            window.onload = function() {
-                window.print();
-            }
-        </script>
-    </body>
-    </html>
-    ''', invoice=invoice)
+# ===== وظائف التصدير =====
 
 @app.route('/export_pdf/<report_type>')
 @login_required
