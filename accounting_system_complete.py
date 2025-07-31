@@ -7225,13 +7225,7 @@ def delete_product(product_id):
     db.session.commit()
     return jsonify({'success': True})
 
-@app.route('/delete_employee/<int:employee_id>', methods=['DELETE'])
-@login_required
-def delete_employee(employee_id):
-    employee = Employee.query.get_or_404(employee_id)
-    db.session.delete(employee)
-    db.session.commit()
-    return jsonify({'success': True})
+
 
 @app.route('/delete_expense/<int:expense_id>', methods=['DELETE'])
 @login_required
