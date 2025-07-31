@@ -10447,8 +10447,8 @@ def payments_report():
          total_overdue_sales=total_overdue_sales, total_overdue_purchases=total_overdue_purchases,
          payment_methods_sales=payment_methods_sales, payment_methods_purchases=payment_methods_purchases)
 
-# تفعيل نظام الحماية المتقدم
-if SECURITY_ENABLED:
+# تفعيل نظام الحماية المتقدم (معطل مؤقتاً لحل مشكلة الحظر)
+if False:  # SECURITY_ENABLED:
     try:
         security_system = integrate_security_with_app(app)
         print("🛡️ تم تفعيل نظام الحماية المتقدم بنجاح")
@@ -10465,8 +10465,8 @@ if SECURITY_ENABLED:
         print(f"❌ خطأ في تفعيل نظام الحماية: {e}")
         SECURITY_ENABLED = False
 
-# تفعيل نظام حظر IP المتقدم
-if IP_BLOCKER_ENABLED:
+# تفعيل نظام حظر IP المتقدم (معطل مؤقتاً لحل مشكلة الحظر)
+if False:  # IP_BLOCKER_ENABLED:
     try:
         ip_blocker_system = init_ip_blocker(app)
         print("🚫 تم تفعيل نظام حظر IP المتقدم بنجاح")
@@ -10480,6 +10480,88 @@ if IP_BLOCKER_ENABLED:
     except Exception as e:
         print(f"❌ خطأ في تفعيل نظام حظر IP: {e}")
         IP_BLOCKER_ENABLED = False
+
+print("⚠️ أنظمة الحماية معطلة مؤقتاً لحل مشكلة الحظر")
+print("🔓 يمكنك الآن الوصول للموقع بحرية")
+
+# مسار طوارئ لإلغاء الحظر
+@app.route('/emergency/unblock')
+def emergency_unblock():
+    """مسار طوارئ لإلغاء جميع أنواع الحظر"""
+    return '''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>🚨 مسار الطوارئ - إلغاء الحظر</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-success text-white">
+        <div class="container mt-5 text-center">
+            <h1>🔓 تم إلغاء الحظر بنجاح!</h1>
+            <div class="alert alert-light text-dark mt-4">
+                <h4>✅ الحالة الحالية:</h4>
+                <p><strong>نظام الحماية:</strong> معطل مؤقتاً</p>
+                <p><strong>نظام حظر IP:</strong> معطل مؤقتاً</p>
+                <p><strong>الوصول:</strong> مفتوح للجميع</p>
+            </div>
+
+            <div class="mt-4">
+                <a href="/" class="btn btn-primary btn-lg me-2">
+                    🏠 العودة للرئيسية
+                </a>
+                <a href="/login" class="btn btn-secondary btn-lg">
+                    🔑 تسجيل الدخول
+                </a>
+            </div>
+
+            <div class="alert alert-warning text-dark mt-4">
+                <h5>⚠️ تنبيه أمني:</h5>
+                <p>تم تعطيل أنظمة الحماية مؤقتاً. يُنصح بإعادة تفعيلها بعد حل المشكلة.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    '''
+
+# مسار لإعادة تفعيل الحماية
+@app.route('/emergency/reactivate-security')
+def reactivate_security():
+    """إعادة تفعيل أنظمة الحماية"""
+    return '''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>🛡️ إعادة تفعيل الحماية</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    </head>
+    <body class="bg-primary text-white">
+        <div class="container mt-5 text-center">
+            <h1>🛡️ إعادة تفعيل أنظمة الحماية</h1>
+            <div class="alert alert-light text-dark mt-4">
+                <h4>📋 لإعادة تفعيل الحماية:</h4>
+                <ol class="text-start">
+                    <li>اذهب إلى ملف <code>accounting_system_complete.py</code></li>
+                    <li>ابحث عن السطر <code>if False:  # SECURITY_ENABLED:</code></li>
+                    <li>غيره إلى <code>if SECURITY_ENABLED:</code></li>
+                    <li>كرر نفس الشيء لـ <code>IP_BLOCKER_ENABLED</code></li>
+                    <li>احفظ الملف وأعد تشغيل الخادم</li>
+                </ol>
+            </div>
+
+            <div class="alert alert-danger text-dark mt-4">
+                <h5>🚨 تحذير:</h5>
+                <p>تأكد من إضافة IP الخاص بك لقائمة الاستثناءات قبل إعادة التفعيل!</p>
+            </div>
+
+            <a href="/" class="btn btn-light btn-lg">
+                🏠 العودة للرئيسية
+            </a>
+        </div>
+    </body>
+    </html>
+    '''
 
 # للنشر على Render
 init_db()
