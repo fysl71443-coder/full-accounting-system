@@ -8437,17 +8437,22 @@ def users():
                                     </td>
                                     <td>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else '-' }}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-outline-warning" onclick="editUser({{ user.id }})">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        {% if user.id != current_user.id %}
-                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteUser({{ user.id }}, '{{ user.username }}')">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                        {% endif %}
-                                        <button class="btn btn-sm btn-outline-info" onclick="resetPassword({{ user.id }})">
-                                            <i class="fas fa-key"></i>
-                                        </button>
+                                        <div class="btn-group" role="group">
+                                            <button class="btn btn-sm btn-outline-primary" title="تعديل" onclick="editUser({{ user.id }})">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-warning" title="الصلاحيات" onclick="managePermissions({{ user.id }}, '{{ user.username }}', '{{ user.role }}')">
+                                                <i class="fas fa-user-shield"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-info" title="إعادة تعيين كلمة المرور" onclick="resetPassword({{ user.id }})">
+                                                <i class="fas fa-key"></i>
+                                            </button>
+                                            {% if user.id != current_user.id %}
+                                            <button class="btn btn-sm btn-outline-danger" title="حذف" onclick="deleteUser({{ user.id }}, '{{ user.username }}')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                            {% endif %}
+                                        </div>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -8502,6 +8507,99 @@ def users():
             function editUser(id) {
                 // تحميل بيانات المستخدم وفتح نموذج التحرير
                 alert('سيتم تطوير تحرير المستخدم قريباً');
+            }
+
+            function managePermissions(userId, username, currentRole) {
+                // إنشاء مودال الصلاحيات ديناميكياً
+                const modalHtml = `
+                    <div class="modal fade" id="permissionsModal" tabindex="-1">
+                        <div class="modal-dialog modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-header bg-warning text-dark">
+                                    <h5 class="modal-title">
+                                        <i class="fas fa-user-shield me-2"></i>إدارة صلاحيات: ${username}
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="row">
+                                        <div class="col-12 mb-4">
+                                            <h6 class="fw-bold">مستوى الصلاحية:</h6>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="role" value="user" id="role_user" ${currentRole === 'user' ? 'checked' : ''}>
+                                                <label class="form-check-label" for="role_user">
+                                                    <span class="badge bg-success me-2">مستخدم</span>
+                                                    صلاحيات أساسية (عرض البيانات فقط)
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="role" value="manager" id="role_manager" ${currentRole === 'manager' ? 'checked' : ''}>
+                                                <label class="form-check-label" for="role_manager">
+                                                    <span class="badge bg-primary me-2">مشرف</span>
+                                                    صلاحيات متوسطة (إضافة وتعديل البيانات)
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="role" value="admin" id="role_admin" ${currentRole === 'admin' ? 'checked' : ''}>
+                                                <label class="form-check-label" for="role_admin">
+                                                    <span class="badge bg-danger me-2">مدير</span>
+                                                    صلاحيات كاملة (جميع العمليات)
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                                    <button type="button" class="btn btn-warning" onclick="saveUserPermissions(${userId})">
+                                        <i class="fas fa-save me-2"></i>حفظ الصلاحيات
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // إزالة المودال السابق إن وجد
+                const existingModal = document.getElementById('permissionsModal');
+                if (existingModal) {
+                    existingModal.remove();
+                }
+
+                // إضافة المودال الجديد
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+                // عرض المودال
+                const modal = new bootstrap.Modal(document.getElementById('permissionsModal'));
+                modal.show();
+            }
+
+            function saveUserPermissions(userId) {
+                const selectedRole = document.querySelector('input[name="role"]:checked').value;
+
+                fetch('/update_user_permissions/' + userId, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        role: selectedRole
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('تم تحديث الصلاحيات بنجاح');
+                        bootstrap.Modal.getInstance(document.getElementById('permissionsModal')).hide();
+                        location.reload();
+                    } else {
+                        alert('حدث خطأ: ' + (data.message || 'خطأ غير معروف'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('حدث خطأ أثناء التحديث');
+                });
             }
 
             function deleteUser(id, username) {
@@ -8943,6 +9041,12 @@ def settings():
                                     <button type="button" class="btn btn-warning btn-settings" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
                                         <i class="fas fa-key me-2"></i>تغيير كلمة المرور
                                     </button>
+                                    <a href="{{ url_for('print_settings') }}" class="btn btn-info btn-settings">
+                                        <i class="fas fa-print me-2"></i>إعدادات الطباعة
+                                    </a>
+                                    <button type="button" class="btn btn-secondary btn-settings" onclick="createBackup()">
+                                        <i class="fas fa-download me-2"></i>نسخة احتياطية
+                                    </button>
                                 </div>
                             </form>
                         </div>
@@ -8955,21 +9059,43 @@ def settings():
                             <h5 class="mb-0 fw-bold"><i class="fas fa-cogs me-2"></i>إعدادات النظام</h5>
                         </div>
                         <div class="card-body p-4">
-                            <form>
+                            <form id="systemSettingsForm">
                                 <div class="mb-3">
                                     <label class="form-label fw-bold">اسم الشركة</label>
-                                    <input type="text" class="form-control" value="شركة المحاسبة الاحترافية">
+                                    <input type="text" class="form-control" id="systemCompanyName" value="شركة المحاسبة الاحترافية">
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold">معدل الضريبة (%)</label>
-                                    <input type="number" class="form-control" value="15" step="0.01">
+                                    <label class="form-label fw-bold">الرقم الضريبي</label>
+                                    <input type="text" class="form-control" id="systemTaxNumber" value="123456789012345">
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold">العملة</label>
-                                    <select class="form-select">
-                                        <option selected>ريال سعودي (ر.س)</option>
-                                        <option>دولار أمريكي ($)</option>
-                                        <option>يورو (€)</option>
+                                    <label class="form-label fw-bold">معدل الضريبة الافتراضي (%)</label>
+                                    <input type="number" class="form-control" id="systemTaxRate" value="15" step="0.01" min="0" max="100">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">العملة الأساسية</label>
+                                    <select class="form-select" id="systemCurrency">
+                                        <option value="SAR" selected>ريال سعودي (ر.س)</option>
+                                        <option value="USD">دولار أمريكي ($)</option>
+                                        <option value="EUR">يورو (€)</option>
+                                        <option value="AED">درهم إماراتي (د.إ)</option>
+                                        <option value="KWD">دينار كويتي (د.ك)</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">لغة النظام</label>
+                                    <select class="form-select" id="systemLanguage">
+                                        <option value="ar" selected>العربية</option>
+                                        <option value="en">English</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">المنطقة الزمنية</label>
+                                    <select class="form-select" id="systemTimezone">
+                                        <option value="Asia/Riyadh" selected>الرياض (GMT+3)</option>
+                                        <option value="Asia/Dubai">دبي (GMT+4)</option>
+                                        <option value="Asia/Kuwait">الكويت (GMT+3)</option>
+                                        <option value="UTC">UTC (GMT+0)</option>
                                     </select>
                                 </div>
                                 <div class="d-grid gap-2">
@@ -9141,19 +9267,99 @@ def settings():
         <script>
             // وظائف إعدادات النظام
             function saveSystemSettings() {
-                alert('تم حفظ إعدادات النظام بنجاح');
-                // يمكن إضافة AJAX لحفظ الإعدادات
+                // جمع بيانات الإعدادات
+                const settings = {
+                    companyName: document.getElementById('systemCompanyName').value,
+                    taxNumber: document.getElementById('systemTaxNumber').value,
+                    taxRate: document.getElementById('systemTaxRate').value,
+                    currency: document.getElementById('systemCurrency').value,
+                    language: document.getElementById('systemLanguage').value,
+                    timezone: document.getElementById('systemTimezone').value
+                };
+
+                // حفظ في localStorage
+                localStorage.setItem('systemSettings', JSON.stringify(settings));
+
+                alert('تم حفظ إعدادات النظام بنجاح!');
+                console.log('System settings saved:', settings);
+            }
+
+            function saveCompanySettings() {
+                // جمع بيانات الشركة
+                const companyData = {
+                    name: document.getElementById('companyName').value,
+                    taxNumber: document.getElementById('taxNumber').value,
+                    address: document.getElementById('companyAddress').value,
+                    phone: document.getElementById('companyPhone').value,
+                    email: document.getElementById('companyEmail').value
+                };
+
+                // حفظ في localStorage
+                localStorage.setItem('companySettings', JSON.stringify(companyData));
+
+                alert('تم حفظ إعدادات الشركة بنجاح!');
+                console.log('Company settings saved:', companyData);
+            }
+
+            function loadSettings() {
+                // تحميل إعدادات النظام
+                const systemSettings = localStorage.getItem('systemSettings');
+                if (systemSettings) {
+                    const settings = JSON.parse(systemSettings);
+                    if (document.getElementById('systemCompanyName')) {
+                        document.getElementById('systemCompanyName').value = settings.companyName || '';
+                        document.getElementById('systemTaxNumber').value = settings.taxNumber || '';
+                        document.getElementById('systemTaxRate').value = settings.taxRate || '15';
+                        document.getElementById('systemCurrency').value = settings.currency || 'SAR';
+                        document.getElementById('systemLanguage').value = settings.language || 'ar';
+                        document.getElementById('systemTimezone').value = settings.timezone || 'Asia/Riyadh';
+                    }
+                }
+
+                // تحميل إعدادات الشركة
+                const companySettings = localStorage.getItem('companySettings');
+                if (companySettings) {
+                    const company = JSON.parse(companySettings);
+                    if (document.getElementById('companyName')) {
+                        document.getElementById('companyName').value = company.name || '';
+                        document.getElementById('taxNumber').value = company.taxNumber || '';
+                        document.getElementById('companyAddress').value = company.address || '';
+                        document.getElementById('companyPhone').value = company.phone || '';
+                        document.getElementById('companyEmail').value = company.email || '';
+                    }
+                }
             }
 
             function createBackup() {
                 if (confirm('هل تريد إنشاء نسخة احتياطية من البيانات؟')) {
                     alert('جاري إنشاء النسخة الاحتياطية...');
-                    // يمكن إضافة وظيفة النسخ الاحتياطي هنا
+
+                    // محاكاة إنشاء النسخة الاحتياطية
+                    const backupData = {
+                        timestamp: new Date().toISOString(),
+                        systemSettings: localStorage.getItem('systemSettings'),
+                        companySettings: localStorage.getItem('companySettings'),
+                        printSettings: localStorage.getItem('printSettings')
+                    };
+
+                    // تحويل البيانات إلى JSON وتنزيلها
+                    const dataStr = JSON.stringify(backupData, null, 2);
+                    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                    const url = URL.createObjectURL(dataBlob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `accounting_backup_${new Date().toISOString().split('T')[0]}.json`;
+                    link.click();
+
                     setTimeout(() => {
-                        alert('تم إنشاء النسخة الاحتياطية بنجاح!');
-                    }, 2000);
+                        alert('تم إنشاء النسخة الاحتياطية وتنزيلها بنجاح!');
+                        URL.revokeObjectURL(url);
+                    }, 1000);
                 }
             }
+
+            // تحميل الإعدادات عند فتح الصفحة
+            window.addEventListener('load', loadSettings);
 
             function confirmReset() {
                 if (confirm('هل أنت متأكد من إعادة تعيين النظام؟ سيتم حذف جميع البيانات!')) {

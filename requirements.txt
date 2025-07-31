@@ -8,7 +8,7 @@ Flask-SQLAlchemy==3.0.5
 Flask-Login==0.6.3
 
 # Security and utilities
-Werkzeug==2.3.7
+Werkzeug>=2.3.0,<3.0.0
 
 # Production server
 gunicorn==21.2.0
