@@ -2120,26 +2120,27 @@ def purchases():
 
         <!-- Modal إضافة فاتورة مشتريات -->
         <div class="modal fade" id="addPurchaseModal" tabindex="-1">
-            <div class="modal-dialog modal-lg">
+            <div class="modal-dialog modal-xl">
                 <div class="modal-content">
                     <div class="modal-header bg-secondary text-white">
-                        <h5 class="modal-title"><i class="fas fa-plus me-2"></i>فاتورة مشتريات جديدة</h5>
+                        <h5 class="modal-title fw-bold"><i class="fas fa-plus me-2"></i>فاتورة مشتريات جديدة</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
-                    <form method="POST" action="{{ url_for('add_purchase') }}">
+                    <form method="POST" action="{{ url_for('add_purchase') }}" id="purchaseInvoiceForm">
                         <div class="modal-body">
-                            <div class="row">
-                                <div class="col-md-6">
+                            <!-- معلومات الفاتورة الأساسية -->
+                            <div class="row mb-4">
+                                <div class="col-md-4">
                                     <div class="mb-3">
-                                        <label for="invoice_number" class="form-label">رقم الفاتورة *</label>
-                                        <input type="text" class="form-control" id="invoice_number" name="invoice_number"
+                                        <label for="purchase_invoice_number" class="form-label fw-bold">رقم الفاتورة *</label>
+                                        <input type="text" class="form-control" id="purchase_invoice_number" name="invoice_number"
                                                value="PUR-{{ format_date('%Y%m%d') }}-{{ zfill_number(purchases|length + 1, 3) }}" required>
                                     </div>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <div class="mb-3">
-                                        <label for="supplier_id" class="form-label">المورد *</label>
-                                        <select class="form-select" id="supplier_id" name="supplier_id" required>
+                                        <label for="purchase_supplier_id" class="form-label fw-bold">المورد *</label>
+                                        <select class="form-select" id="purchase_supplier_id" name="supplier_id" required>
                                             <option value="">اختر المورد</option>
                                             {% for supplier in suppliers %}
                                             <option value="{{ supplier.id }}">{{ supplier.name }}</option>
@@ -2147,31 +2148,126 @@ def purchases():
                                         </select>
                                     </div>
                                 </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="purchase_payment_method" class="form-label fw-bold">طريقة الدفع *</label>
+                                        <select class="form-select" id="purchase_payment_method" name="payment_method" required>
+                                            <option value="cash">نقدي</option>
+                                            <option value="mada">مدى</option>
+                                            <option value="visa">فيزا</option>
+                                            <option value="mastercard">ماستركارد</option>
+                                            <option value="bank">تحويل بنكي</option>
+                                            <option value="stc">STC Pay</option>
+                                            <option value="gcc">GCC Pay</option>
+                                            <option value="aks">أكس</option>
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
+
+                            <!-- إعدادات الضريبة -->
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="purchase_has_tax" name="has_tax" checked>
+                                        <label class="form-check-label fw-bold" for="purchase_has_tax">
+                                            تطبيق الضريبة على الفاتورة
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="purchase_tax_rate" class="form-label fw-bold">معدل الضريبة (%)</label>
+                                        <input type="number" step="0.01" class="form-control" id="purchase_tax_rate" name="tax_rate" value="15" min="0" max="100">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- أصناف الفاتورة -->
+                            <div class="mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 class="fw-bold text-secondary">
+                                        <i class="fas fa-list me-2"></i>أصناف فاتورة المشتريات
+                                    </h6>
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="addPurchaseItem()">
+                                        <i class="fas fa-plus me-1"></i>إضافة صنف
+                                    </button>
+                                </div>
+
+                                <div class="table-responsive">
+                                    <table class="table table-bordered" id="purchaseItemsTable">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th width="25%">اسم الصنف</th>
+                                                <th width="20%">الوصف</th>
+                                                <th width="15%">الكمية</th>
+                                                <th width="15%">سعر الوحدة</th>
+                                                <th width="15%">الإجمالي</th>
+                                                <th width="10%">إجراءات</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="purchaseItemsBody">
+                                            <tr class="purchase-item">
+                                                <td>
+                                                    <input type="text" class="form-control purchase-item-name" name="items[0][name]" placeholder="اسم الصنف" required>
+                                                </td>
+                                                <td>
+                                                    <input type="text" class="form-control purchase-item-description" name="items[0][description]" placeholder="الوصف">
+                                                </td>
+                                                <td>
+                                                    <input type="number" step="0.001" class="form-control purchase-item-quantity" name="items[0][quantity]" value="1" min="0.001" required>
+                                                </td>
+                                                <td>
+                                                    <input type="number" step="0.01" class="form-control purchase-item-price" name="items[0][price]" value="0" min="0" required>
+                                                </td>
+                                                <td>
+                                                    <input type="number" step="0.01" class="form-control purchase-item-total" name="items[0][total]" value="0" readonly>
+                                                </td>
+                                                <td>
+                                                    <button type="button" class="btn btn-sm btn-danger" onclick="removePurchaseItem(this)">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- ملخص الفاتورة -->
                             <div class="row">
-                                <div class="col-md-4">
+                                <div class="col-md-8">
                                     <div class="mb-3">
-                                        <label for="subtotal" class="form-label">المبلغ الفرعي *</label>
-                                        <input type="number" step="0.01" class="form-control" id="subtotal" name="subtotal" required>
+                                        <label for="purchase_notes" class="form-label fw-bold">ملاحظات</label>
+                                        <textarea class="form-control" id="purchase_notes" name="notes" rows="2" placeholder="أي ملاحظات إضافية..."></textarea>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
-                                    <div class="mb-3">
-                                        <label for="tax_amount" class="form-label">الضريبة (15%)</label>
-                                        <input type="number" step="0.01" class="form-control" id="tax_amount" name="tax_amount" readonly>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="mb-3">
-                                        <label for="total" class="form-label">الإجمالي</label>
-                                        <input type="number" step="0.01" class="form-control" id="total" name="total" readonly>
+                                    <div class="card bg-light">
+                                        <div class="card-body">
+                                            <h6 class="fw-bold text-secondary mb-3">ملخص فاتورة المشتريات</h6>
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <span>المبلغ الفرعي:</span>
+                                                <span id="purchase_invoice_subtotal">0.00 ر.س</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between mb-2" id="purchase_tax_row">
+                                                <span>الضريبة (<span id="purchase_tax_rate_display">15</span>%):</span>
+                                                <span id="purchase_invoice_tax">0.00 ر.س</span>
+                                            </div>
+                                            <hr>
+                                            <div class="d-flex justify-content-between fw-bold text-secondary">
+                                                <span>الإجمالي:</span>
+                                                <span id="purchase_invoice_total">0.00 ر.س</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="mb-3">
-                                <label for="notes" class="form-label">ملاحظات</label>
-                                <textarea class="form-control" id="notes" name="notes" rows="2" placeholder="أي ملاحظات إضافية..."></textarea>
-                            </div>
+
+                            <!-- الحقول المخفية للإرسال -->
+                            <input type="hidden" id="purchase_subtotal" name="subtotal" value="0">
+                            <input type="hidden" id="purchase_tax_amount" name="tax_amount" value="0">
+                            <input type="hidden" id="purchase_total" name="total" value="0">
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-light" data-bs-dismiss="modal">
@@ -2224,23 +2320,110 @@ def purchases():
             }
 
             function printPurchase(purchaseId) {
-                alert('طباعة فاتورة المشتريات رقم: ' + purchaseId);
-                // يمكن إضافة وظيفة الطباعة
+                window.open('/print_purchase/' + purchaseId, '_blank');
             }
 
-            // حساب الضريبة والإجمالي تلقائياً
-            document.addEventListener('DOMContentLoaded', function() {
-                const subtotalInput = document.getElementById('subtotal');
-                if (subtotalInput) {
-                    subtotalInput.addEventListener('input', function() {
-                        const subtotal = parseFloat(this.value) || 0;
-                        const taxAmount = subtotal * 0.15;
-                        const total = subtotal + taxAmount;
+            // إدارة أصناف فاتورة المشتريات
+            let purchaseItemIndex = 1;
 
-                        document.getElementById('tax_amount').value = taxAmount.toFixed(2);
-                        document.getElementById('total').value = total.toFixed(2);
-                    });
+            function addPurchaseItem() {
+                const tbody = document.getElementById('purchaseItemsBody');
+                const newRow = document.createElement('tr');
+                newRow.className = 'purchase-item';
+                newRow.innerHTML = `
+                    <td>
+                        <input type="text" class="form-control purchase-item-name" name="items[${purchaseItemIndex}][name]" placeholder="اسم الصنف" required>
+                    </td>
+                    <td>
+                        <input type="text" class="form-control purchase-item-description" name="items[${purchaseItemIndex}][description]" placeholder="الوصف">
+                    </td>
+                    <td>
+                        <input type="number" step="0.001" class="form-control purchase-item-quantity" name="items[${purchaseItemIndex}][quantity]" value="1" min="0.001" required>
+                    </td>
+                    <td>
+                        <input type="number" step="0.01" class="form-control purchase-item-price" name="items[${purchaseItemIndex}][price]" value="0" min="0" required>
+                    </td>
+                    <td>
+                        <input type="number" step="0.01" class="form-control purchase-item-total" name="items[${purchaseItemIndex}][total]" value="0" readonly>
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="removePurchaseItem(this)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(newRow);
+                purchaseItemIndex++;
+
+                // إضافة event listeners للحقول الجديدة
+                attachPurchaseItemEventListeners(newRow);
+            }
+
+            function removePurchaseItem(button) {
+                const row = button.closest('tr');
+                if (document.querySelectorAll('.purchase-item').length > 1) {
+                    row.remove();
+                    calculatePurchaseInvoiceTotal();
+                } else {
+                    alert('يجب أن تحتوي الفاتورة على صنف واحد على الأقل');
                 }
+            }
+
+            function attachPurchaseItemEventListeners(row) {
+                const quantityInput = row.querySelector('.purchase-item-quantity');
+                const priceInput = row.querySelector('.purchase-item-price');
+                const totalInput = row.querySelector('.purchase-item-total');
+
+                function calculatePurchaseItemTotal() {
+                    const quantity = parseFloat(quantityInput.value) || 0;
+                    const price = parseFloat(priceInput.value) || 0;
+                    const total = quantity * price;
+                    totalInput.value = total.toFixed(2);
+                    calculatePurchaseInvoiceTotal();
+                }
+
+                quantityInput.addEventListener('input', calculatePurchaseItemTotal);
+                priceInput.addEventListener('input', calculatePurchaseItemTotal);
+            }
+
+            function calculatePurchaseInvoiceTotal() {
+                let subtotal = 0;
+                document.querySelectorAll('.purchase-item-total').forEach(input => {
+                    subtotal += parseFloat(input.value) || 0;
+                });
+
+                const hasTax = document.getElementById('purchase_has_tax').checked;
+                const taxRate = parseFloat(document.getElementById('purchase_tax_rate').value) || 0;
+                const taxAmount = hasTax ? (subtotal * taxRate / 100) : 0;
+                const total = subtotal + taxAmount;
+
+                // تحديث العرض
+                document.getElementById('purchase_invoice_subtotal').textContent = subtotal.toFixed(2) + ' ر.س';
+                document.getElementById('purchase_invoice_tax').textContent = taxAmount.toFixed(2) + ' ر.س';
+                document.getElementById('purchase_invoice_total').textContent = total.toFixed(2) + ' ر.س';
+                document.getElementById('purchase_tax_rate_display').textContent = taxRate;
+
+                // تحديث الحقول المخفية
+                document.getElementById('purchase_subtotal').value = subtotal.toFixed(2);
+                document.getElementById('purchase_tax_amount').value = taxAmount.toFixed(2);
+                document.getElementById('purchase_total').value = total.toFixed(2);
+
+                // إظهار/إخفاء صف الضريبة
+                document.getElementById('purchase_tax_row').style.display = hasTax ? 'flex' : 'none';
+            }
+
+            // تهيئة الصفحة
+            document.addEventListener('DOMContentLoaded', function() {
+
+                // إضافة event listeners للصف الأول
+                const firstPurchaseRow = document.querySelector('.purchase-item');
+                if (firstPurchaseRow) {
+                    attachPurchaseItemEventListeners(firstPurchaseRow);
+                }
+
+                // event listeners لإعدادات الضريبة
+                document.getElementById('purchase_has_tax').addEventListener('change', calculatePurchaseInvoiceTotal);
+                document.getElementById('purchase_tax_rate').addEventListener('input', calculatePurchaseInvoiceTotal);
 
                 // تحسين تجربة المستخدم
                 const cards = document.querySelectorAll('.stat-card');
@@ -2253,6 +2436,31 @@ def purchases():
                         this.style.transform = 'translateY(0)';
                     });
                 });
+
+                // تحسين النموذج
+                const purchaseForm = document.getElementById('purchaseInvoiceForm');
+                if (purchaseForm) {
+                    purchaseForm.addEventListener('submit', function(e) {
+                        const items = document.querySelectorAll('.purchase-item');
+                        let hasValidItems = false;
+
+                        items.forEach(item => {
+                            const name = item.querySelector('.purchase-item-name').value.trim();
+                            const quantity = parseFloat(item.querySelector('.purchase-item-quantity').value);
+                            const price = parseFloat(item.querySelector('.purchase-item-price').value);
+
+                            if (name && quantity > 0 && price >= 0) {
+                                hasValidItems = true;
+                            }
+                        });
+
+                        if (!hasValidItems) {
+                            e.preventDefault();
+                            alert('يجب إضافة صنف واحد صحيح على الأقل');
+                            return false;
+                        }
+                    });
+                }
             });
         </script>
     </body>
@@ -2262,19 +2470,61 @@ def purchases():
 @app.route('/add_purchase', methods=['POST'])
 @login_required
 def add_purchase():
-    purchase = PurchaseInvoice(
-        invoice_number=request.form['invoice_number'],
-        supplier_id=int(request.form['supplier_id']),
-        subtotal=float(request.form['subtotal']),
-        tax_amount=float(request.form.get('tax_amount', 0)),
-        total=float(request.form.get('total', 0)),
-        notes=request.form.get('notes'),
-        status='pending'
-    )
-    db.session.add(purchase)
-    db.session.commit()
-    flash('تم إنشاء فاتورة المشتريات بنجاح', 'success')
-    return redirect(url_for('purchases'))
+    try:
+        # إنشاء فاتورة المشتريات
+        purchase = PurchaseInvoice(
+            invoice_number=request.form['invoice_number'],
+            supplier_id=int(request.form['supplier_id']),
+            subtotal=float(request.form['subtotal']),
+            tax_amount=float(request.form.get('tax_amount', 0)),
+            tax_rate=float(request.form.get('tax_rate', 15)),
+            has_tax=bool(request.form.get('has_tax')),
+            total=float(request.form.get('total', 0)),
+            payment_method=request.form.get('payment_method', 'cash'),
+            notes=request.form.get('notes'),
+            status='pending'
+        )
+        db.session.add(purchase)
+        db.session.flush()  # للحصول على ID الفاتورة
+
+        # إضافة أصناف فاتورة المشتريات
+        items_data = {}
+        for key, value in request.form.items():
+            if key.startswith('items[') and '][' in key:
+                # استخراج الفهرس والحقل من اسم الحقل
+                parts = key.split('][')
+                index = parts[0].split('[')[1]
+                field = parts[1].rstrip(']')
+
+                if index not in items_data:
+                    items_data[index] = {}
+                items_data[index][field] = value
+
+        # إنشاء أصناف فاتورة المشتريات
+        for index, item_data in items_data.items():
+            if item_data.get('name') and item_data.get('quantity') and item_data.get('price'):
+                quantity = float(item_data['quantity'])
+                price = float(item_data['price'])
+                total_price = quantity * price
+
+                item = PurchaseInvoiceItem(
+                    invoice_id=purchase.id,
+                    product_name=item_data['name'],
+                    description=item_data.get('description', ''),
+                    quantity=quantity,
+                    unit_price=price,
+                    total_price=total_price
+                )
+                db.session.add(item)
+
+        db.session.commit()
+        flash('تم إنشاء فاتورة المشتريات بنجاح', 'success')
+        return redirect(url_for('purchases'))
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'حدث خطأ أثناء إنشاء فاتورة المشتريات: {str(e)}', 'error')
+        return redirect(url_for('purchases'))
 
 @app.route('/delete_purchase/<int:purchase_id>', methods=['DELETE'])
 @login_required
@@ -2286,6 +2536,1289 @@ def delete_purchase(purchase_id):
         return jsonify({'success': True, 'message': 'تم حذف فاتورة المشتريات بنجاح'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
+
+# وظائف إدارة الموظفين المتقدمة
+@app.route('/view_employee/<int:employee_id>')
+@login_required
+def view_employee(employee_id):
+    employee = Employee.query.get_or_404(employee_id)
+    payrolls = EmployeePayroll.query.filter_by(employee_id=employee_id).order_by(EmployeePayroll.year.desc(), EmployeePayroll.month.desc()).all()
+
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>ملف الموظف - {{ employee.name }}</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            body {
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+            .navbar {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            }
+            .employee-card {
+                background: white;
+                border-radius: 20px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                border: none;
+                overflow: hidden;
+            }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-calculator me-2"></i>نظام المحاسبة الاحترافي
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="{{ url_for('employees') }}">
+                        <i class="fas fa-arrow-right me-1"></i>رجوع للموظفين
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <div class="text-center mb-5">
+                <h1 class="display-5 fw-bold text-primary">
+                    <i class="fas fa-user me-3"></i>ملف الموظف
+                </h1>
+            </div>
+
+            <!-- معلومات الموظف -->
+            <div class="row mb-4">
+                <div class="col-md-8">
+                    <div class="employee-card p-4">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5 class="fw-bold text-primary mb-3">المعلومات الشخصية</h5>
+                                <p><strong>الاسم:</strong> {{ employee.name }}</p>
+                                <p><strong>المنصب:</strong> {{ employee.position }}</p>
+                                <p><strong>الهاتف:</strong> {{ employee.phone or '-' }}</p>
+                                <p><strong>البريد الإلكتروني:</strong> {{ employee.email or '-' }}</p>
+                                <p><strong>تاريخ التوظيف:</strong> {{ employee.hire_date.strftime('%Y-%m-%d') }}</p>
+                                <p><strong>الحالة:</strong>
+                                    <span class="badge {% if employee.status == 'active' %}bg-success{% else %}bg-danger{% endif %}">
+                                        {{ 'نشط' if employee.status == 'active' else 'غير نشط' }}
+                                    </span>
+                                </p>
+                            </div>
+                            <div class="col-md-6">
+                                <h5 class="fw-bold text-success mb-3">معلومات الراتب</h5>
+                                <p><strong>الراتب الأساسي:</strong> {{ "%.2f"|format(employee.salary) }} ر.س</p>
+                                <p><strong>أيام العمل:</strong> {{ employee.working_days or 30 }} يوم</p>
+                                <p><strong>معدل الساعة الإضافية:</strong> {{ "%.2f"|format(employee.overtime_rate or 0) }} ر.س</p>
+                                <p><strong>البدلات:</strong> {{ "%.2f"|format(employee.allowances or 0) }} ر.س</p>
+                                <p><strong>الاستقطاعات:</strong> {{ "%.2f"|format(employee.deductions or 0) }} ر.س</p>
+                                <p><strong>صافي الراتب:</strong>
+                                    <span class="fw-bold text-success">
+                                        {{ "%.2f"|format((employee.salary or 0) + (employee.allowances or 0) - (employee.deductions or 0)) }} ر.س
+                                    </span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="employee-card p-4 text-center">
+                        <div class="avatar-circle bg-primary text-white mx-auto mb-3" style="width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem;">
+                            {{ employee.name[0].upper() }}
+                        </div>
+                        <h5 class="fw-bold">{{ employee.name }}</h5>
+                        <p class="text-muted">{{ employee.position }}</p>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-success" onclick="generatePayroll({{ employee.id }})">
+                                <i class="fas fa-money-check me-2"></i>إنشاء كشف راتب
+                            </button>
+                            <button class="btn btn-warning" onclick="editEmployee({{ employee.id }})">
+                                <i class="fas fa-edit me-2"></i>تعديل البيانات
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- كشوف الرواتب السابقة -->
+            {% if payrolls %}
+            <div class="employee-card">
+                <div class="card-header bg-info text-white p-4">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="fas fa-history me-2"></i>كشوف الرواتب السابقة
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>الشهر/السنة</th>
+                                    <th>الراتب الأساسي</th>
+                                    <th>الساعات الإضافية</th>
+                                    <th>البدلات</th>
+                                    <th>الاستقطاعات</th>
+                                    <th>صافي الراتب</th>
+                                    <th>الحالة</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payroll in payrolls %}
+                                <tr>
+                                    <td>{{ payroll.month }}/{{ payroll.year }}</td>
+                                    <td>{{ "%.2f"|format(payroll.basic_salary) }} ر.س</td>
+                                    <td>{{ "%.2f"|format(payroll.overtime_amount) }} ر.س</td>
+                                    <td>{{ "%.2f"|format(payroll.allowances) }} ر.س</td>
+                                    <td>{{ "%.2f"|format(payroll.deductions) }} ر.س</td>
+                                    <td class="fw-bold text-success">{{ "%.2f"|format(payroll.net_salary) }} ر.س</td>
+                                    <td>
+                                        <span class="badge {% if payroll.status == 'paid' %}bg-success{% else %}bg-warning{% endif %}">
+                                            {{ 'مدفوع' if payroll.status == 'paid' else 'معلق' }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            function generatePayroll(employeeId) {
+                window.location.href = '/generate_payroll/' + employeeId;
+            }
+
+            function editEmployee(employeeId) {
+                window.location.href = '/edit_employee/' + employeeId;
+            }
+        </script>
+    </body>
+    </html>
+    ''', employee=employee, payrolls=payrolls)
+
+@app.route('/delete_employee/<int:employee_id>', methods=['DELETE'])
+@login_required
+def delete_employee(employee_id):
+    try:
+        employee = Employee.query.get_or_404(employee_id)
+        db.session.delete(employee)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'تم حذف الموظف بنجاح'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/generate_payroll/<int:employee_id>')
+@login_required
+def generate_payroll(employee_id):
+    from datetime import datetime
+    employee = Employee.query.get_or_404(employee_id)
+    current_month = datetime.now().month
+    current_year = datetime.now().year
+
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>إنشاء كشف راتب - {{ employee.name }}</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            body {
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+            .navbar {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            }
+            .payroll-card {
+                background: white;
+                border-radius: 20px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                border: none;
+                overflow: hidden;
+            }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-calculator me-2"></i>نظام المحاسبة الاحترافي
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="{{ url_for('view_employee', employee_id=employee.id) }}">
+                        <i class="fas fa-arrow-right me-1"></i>رجوع لملف الموظف
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <div class="text-center mb-5">
+                <h1 class="display-5 fw-bold text-success">
+                    <i class="fas fa-money-check me-3"></i>إنشاء كشف راتب
+                </h1>
+                <p class="lead text-muted">{{ employee.name }} - {{ employee.position }}</p>
+            </div>
+
+            <div class="row justify-content-center">
+                <div class="col-md-8">
+                    <div class="payroll-card">
+                        <div class="card-header bg-success text-white p-4">
+                            <h5 class="mb-0 fw-bold">
+                                <i class="fas fa-calendar me-2"></i>بيانات كشف الراتب
+                            </h5>
+                        </div>
+                        <div class="card-body p-4">
+                            <form method="POST" action="{{ url_for('save_payroll') }}">
+                                <input type="hidden" name="employee_id" value="{{ employee.id }}">
+
+                                <div class="row mb-4">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">الشهر</label>
+                                        <select class="form-select" name="month" required>
+                                            {% for i in range(1, 13) %}
+                                            <option value="{{ i }}" {% if i == current_month %}selected{% endif %}>
+                                                {% if i == 1 %}يناير{% elif i == 2 %}فبراير{% elif i == 3 %}مارس{% elif i == 4 %}أبريل{% elif i == 5 %}مايو{% elif i == 6 %}يونيو{% elif i == 7 %}يوليو{% elif i == 8 %}أغسطس{% elif i == 9 %}سبتمبر{% elif i == 10 %}أكتوبر{% elif i == 11 %}نوفمبر{% else %}ديسمبر{% endif %}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">السنة</label>
+                                        <input type="number" class="form-control" name="year" value="{{ current_year }}" min="2020" max="2030" required>
+                                    </div>
+                                </div>
+
+                                <div class="row mb-4">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">الراتب الأساسي</label>
+                                        <input type="number" step="0.01" class="form-control" name="basic_salary" value="{{ employee.salary }}" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">أيام العمل الفعلية</label>
+                                        <input type="number" class="form-control" name="actual_working_days" value="{{ employee.working_days or 30 }}" min="1" max="31" required>
+                                    </div>
+                                </div>
+
+                                <div class="row mb-4">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">الساعات الإضافية</label>
+                                        <input type="number" step="0.01" class="form-control" name="overtime_hours" value="0" min="0" id="overtime_hours">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">مبلغ الساعات الإضافية</label>
+                                        <input type="number" step="0.01" class="form-control" name="overtime_amount" value="0" readonly id="overtime_amount">
+                                    </div>
+                                </div>
+
+                                <div class="row mb-4">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">البدلات</label>
+                                        <input type="number" step="0.01" class="form-control" name="allowances" value="{{ employee.allowances or 0 }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">الاستقطاعات</label>
+                                        <input type="number" step="0.01" class="form-control" name="deductions" value="{{ employee.deductions or 0 }}">
+                                    </div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold">ملاحظات</label>
+                                    <textarea class="form-control" name="notes" rows="3" placeholder="أي ملاحظات إضافية..."></textarea>
+                                </div>
+
+                                <div class="card bg-light p-3 mb-4">
+                                    <h6 class="fw-bold text-success mb-3">ملخص كشف الراتب</h6>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <p>الراتب الأساسي: <span id="display_basic">{{ "%.2f"|format(employee.salary) }}</span> ر.س</p>
+                                            <p>الساعات الإضافية: <span id="display_overtime">0.00</span> ر.س</p>
+                                            <p>البدلات: <span id="display_allowances">{{ "%.2f"|format(employee.allowances or 0) }}</span> ر.س</p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <p>الاستقطاعات: <span id="display_deductions">{{ "%.2f"|format(employee.deductions or 0) }}</span> ر.س</p>
+                                            <p class="fw-bold text-success">صافي الراتب: <span id="display_net">{{ "%.2f"|format(employee.salary + (employee.allowances or 0) - (employee.deductions or 0)) }}</span> ر.س</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button type="button" class="btn btn-secondary" onclick="history.back()">
+                                        <i class="fas fa-times me-2"></i>إلغاء
+                                    </button>
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-save me-2"></i>حفظ كشف الراتب
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            // حساب الساعات الإضافية تلقائياً
+            document.getElementById('overtime_hours').addEventListener('input', function() {
+                const hours = parseFloat(this.value) || 0;
+                const rate = {{ employee.overtime_rate or 0 }};
+                const amount = hours * rate;
+                document.getElementById('overtime_amount').value = amount.toFixed(2);
+                document.getElementById('display_overtime').textContent = amount.toFixed(2);
+                calculateNetSalary();
+            });
+
+            // حساب صافي الراتب
+            function calculateNetSalary() {
+                const basic = parseFloat(document.querySelector('[name="basic_salary"]').value) || 0;
+                const overtime = parseFloat(document.getElementById('overtime_amount').value) || 0;
+                const allowances = parseFloat(document.querySelector('[name="allowances"]').value) || 0;
+                const deductions = parseFloat(document.querySelector('[name="deductions"]').value) || 0;
+
+                const net = basic + overtime + allowances - deductions;
+
+                document.getElementById('display_basic').textContent = basic.toFixed(2);
+                document.getElementById('display_allowances').textContent = allowances.toFixed(2);
+                document.getElementById('display_deductions').textContent = deductions.toFixed(2);
+                document.getElementById('display_net').textContent = net.toFixed(2);
+            }
+
+            // إضافة event listeners للحقول
+            document.querySelector('[name="basic_salary"]').addEventListener('input', calculateNetSalary);
+            document.querySelector('[name="allowances"]').addEventListener('input', calculateNetSalary);
+            document.querySelector('[name="deductions"]').addEventListener('input', calculateNetSalary);
+        </script>
+    </body>
+    </html>
+    ''', employee=employee, current_month=current_month, current_year=current_year)
+
+@app.route('/save_payroll', methods=['POST'])
+@login_required
+def save_payroll():
+    try:
+        employee_id = int(request.form['employee_id'])
+        month = int(request.form['month'])
+        year = int(request.form['year'])
+
+        # التحقق من عدم وجود كشف راتب لنفس الشهر والسنة
+        existing_payroll = EmployeePayroll.query.filter_by(
+            employee_id=employee_id,
+            month=month,
+            year=year
+        ).first()
+
+        if existing_payroll:
+            flash('يوجد كشف راتب لهذا الموظف في نفس الشهر والسنة', 'error')
+            return redirect(url_for('generate_payroll', employee_id=employee_id))
+
+        # حساب المبالغ
+        basic_salary = float(request.form['basic_salary'])
+        overtime_hours = float(request.form.get('overtime_hours', 0))
+        overtime_amount = float(request.form.get('overtime_amount', 0))
+        allowances = float(request.form.get('allowances', 0))
+        deductions = float(request.form.get('deductions', 0))
+
+        gross_salary = basic_salary + overtime_amount + allowances
+        net_salary = gross_salary - deductions
+
+        # إنشاء كشف الراتب
+        payroll = EmployeePayroll(
+            employee_id=employee_id,
+            month=month,
+            year=year,
+            basic_salary=basic_salary,
+            working_days=int(request.form.get('working_days', 30)),
+            actual_working_days=int(request.form['actual_working_days']),
+            overtime_hours=overtime_hours,
+            overtime_amount=overtime_amount,
+            allowances=allowances,
+            deductions=deductions,
+            gross_salary=gross_salary,
+            net_salary=net_salary,
+            notes=request.form.get('notes'),
+            status='pending'
+        )
+
+        db.session.add(payroll)
+        db.session.commit()
+
+        flash('تم إنشاء كشف الراتب بنجاح', 'success')
+        return redirect(url_for('view_employee', employee_id=employee_id))
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'حدث خطأ أثناء إنشاء كشف الراتب: {str(e)}', 'error')
+        return redirect(url_for('generate_payroll', employee_id=request.form.get('employee_id', 1)))
+
+# تقرير الموظفين التفصيلي
+@app.route('/employees_report')
+@login_required
+def employees_report():
+    from sqlalchemy import func
+
+    employees = Employee.query.all()
+    total_employees = len(employees)
+    active_employees = len([e for e in employees if e.status == 'active'])
+    total_salaries = sum(e.salary for e in employees if e.status == 'active')
+    total_allowances = sum(e.allowances or 0 for e in employees if e.status == 'active')
+    total_deductions = sum(e.deductions or 0 for e in employees if e.status == 'active')
+
+    # الموظفين حسب المنصب
+    positions = {}
+    for employee in employees:
+        if employee.position not in positions:
+            positions[employee.position] = []
+        positions[employee.position].append(employee)
+
+    # كشوف الرواتب الحديثة
+    recent_payrolls = EmployeePayroll.query.order_by(EmployeePayroll.created_at.desc()).limit(10).all()
+
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>تقرير الموظفين التفصيلي - نظام المحاسبة</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+            body {
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+            .navbar {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            }
+            .stat-card {
+                background: white;
+                border-radius: 20px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                transition: all 0.3s ease;
+                border: none;
+                overflow: hidden;
+            }
+            .stat-card:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+            }
+            .chart-container {
+                position: relative;
+                height: 400px;
+                margin: 20px 0;
+            }
+            @media print {
+                .no-print { display: none !important; }
+                body { background: white !important; }
+                .stat-card { box-shadow: none !important; border: 1px solid #ddd !important; }
+            }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand-lg navbar-dark no-print">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-calculator me-2"></i>نظام المحاسبة الاحترافي
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <button class="btn btn-light me-2" onclick="window.print()">
+                        <i class="fas fa-print me-1"></i>طباعة
+                    </button>
+                    <div class="dropdown me-2">
+                        <button class="btn btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-filter me-1"></i>فلترة
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="?status=active">الموظفين النشطين</a></li>
+                            <li><a class="dropdown-item" href="?status=inactive">الموظفين غير النشطين</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('employees_report') }}">جميع الموظفين</a></li>
+                        </ul>
+                    </div>
+                    <a class="nav-link" href="{{ url_for('reports') }}">
+                        <i class="fas fa-arrow-right me-1"></i>رجوع للتقارير
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <div class="text-center mb-5">
+                <h1 class="display-4 fw-bold text-primary">
+                    <i class="fas fa-users me-3"></i>تقرير الموظفين التفصيلي
+                </h1>
+                <p class="lead text-muted">تحليل شامل لجميع موظفي الشركة ورواتبهم</p>
+            </div>
+
+            <!-- الإحصائيات الرئيسية -->
+            <div class="row g-4 mb-5">
+                <div class="col-md-3">
+                    <div class="stat-card text-center p-4">
+                        <div class="text-primary mb-3">
+                            <i class="fas fa-users fa-3x"></i>
+                        </div>
+                        <h3 class="fw-bold text-primary">{{ total_employees }}</h3>
+                        <p class="text-muted mb-0">إجمالي الموظفين</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card text-center p-4">
+                        <div class="text-success mb-3">
+                            <i class="fas fa-user-check fa-3x"></i>
+                        </div>
+                        <h3 class="fw-bold text-success">{{ active_employees }}</h3>
+                        <p class="text-muted mb-0">الموظفين النشطين</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card text-center p-4">
+                        <div class="text-warning mb-3">
+                            <i class="fas fa-money-bill-wave fa-3x"></i>
+                        </div>
+                        <h3 class="fw-bold text-warning">{{ "%.2f"|format(total_salaries) }}</h3>
+                        <p class="text-muted mb-0">إجمالي الرواتب (ر.س)</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stat-card text-center p-4">
+                        <div class="text-info mb-3">
+                            <i class="fas fa-calculator fa-3x"></i>
+                        </div>
+                        <h3 class="fw-bold text-info">{{ "%.2f"|format(total_salaries + total_allowances - total_deductions) }}</h3>
+                        <p class="text-muted mb-0">صافي الرواتب (ر.س)</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- الرسوم البيانية -->
+            <div class="row g-4 mb-5">
+                <div class="col-md-6">
+                    <div class="stat-card p-4">
+                        <h5 class="fw-bold mb-4">
+                            <i class="fas fa-chart-pie me-2"></i>الموظفين حسب المنصب
+                        </h5>
+                        <div class="chart-container">
+                            <canvas id="positionsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="stat-card p-4">
+                        <h5 class="fw-bold mb-4">
+                            <i class="fas fa-chart-bar me-2"></i>توزيع الرواتب
+                        </h5>
+                        <div class="chart-container">
+                            <canvas id="salariesChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- تفاصيل الموظفين -->
+            <div class="row mb-5">
+                <div class="col-12">
+                    <div class="stat-card">
+                        <div class="card-header bg-primary text-white p-4">
+                            <h5 class="mb-0 fw-bold">
+                                <i class="fas fa-list me-2"></i>تفاصيل جميع الموظفين
+                            </h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>الاسم</th>
+                                            <th>المنصب</th>
+                                            <th>تاريخ التوظيف</th>
+                                            <th>الراتب الأساسي</th>
+                                            <th>البدلات</th>
+                                            <th>الاستقطاعات</th>
+                                            <th>صافي الراتب</th>
+                                            <th>الحالة</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for employee in employees %}
+                                        <tr>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="avatar-circle bg-primary text-white me-2" style="width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem;">
+                                                        {{ employee.name[0].upper() }}
+                                                    </div>
+                                                    <strong>{{ employee.name }}</strong>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-info">{{ employee.position }}</span>
+                                            </td>
+                                            <td>{{ employee.hire_date.strftime('%Y-%m-%d') }}</td>
+                                            <td class="fw-bold text-primary">{{ "%.2f"|format(employee.salary) }} ر.س</td>
+                                            <td class="text-success">
+                                                {% if employee.allowances and employee.allowances > 0 %}
+                                                {{ "%.2f"|format(employee.allowances) }} ر.س
+                                                {% else %}
+                                                -
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-danger">
+                                                {% if employee.deductions and employee.deductions > 0 %}
+                                                {{ "%.2f"|format(employee.deductions) }} ر.س
+                                                {% else %}
+                                                -
+                                                {% endif %}
+                                            </td>
+                                            <td class="fw-bold text-success">
+                                                {{ "%.2f"|format((employee.salary or 0) + (employee.allowances or 0) - (employee.deductions or 0)) }} ر.س
+                                            </td>
+                                            <td>
+                                                {% if employee.status == 'active' %}
+                                                <span class="badge bg-success">نشط</span>
+                                                {% else %}
+                                                <span class="badge bg-danger">غير نشط</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- كشوف الرواتب الحديثة -->
+            {% if recent_payrolls %}
+            <div class="row mb-5">
+                <div class="col-12">
+                    <div class="stat-card">
+                        <div class="card-header bg-success text-white p-4">
+                            <h5 class="mb-0 fw-bold">
+                                <i class="fas fa-history me-2"></i>كشوف الرواتب الحديثة
+                            </h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>الموظف</th>
+                                            <th>الشهر/السنة</th>
+                                            <th>الراتب الأساسي</th>
+                                            <th>الساعات الإضافية</th>
+                                            <th>صافي الراتب</th>
+                                            <th>الحالة</th>
+                                            <th>تاريخ الإنشاء</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for payroll in recent_payrolls %}
+                                        <tr>
+                                            <td><strong>{{ payroll.employee.name }}</strong></td>
+                                            <td>{{ payroll.month }}/{{ payroll.year }}</td>
+                                            <td>{{ "%.2f"|format(payroll.basic_salary) }} ر.س</td>
+                                            <td>{{ "%.2f"|format(payroll.overtime_amount) }} ر.س</td>
+                                            <td class="fw-bold text-success">{{ "%.2f"|format(payroll.net_salary) }} ر.س</td>
+                                            <td>
+                                                <span class="badge {% if payroll.status == 'paid' %}bg-success{% else %}bg-warning{% endif %}">
+                                                    {{ 'مدفوع' if payroll.status == 'paid' else 'معلق' }}
+                                                </span>
+                                            </td>
+                                            <td>{{ payroll.created_at.strftime('%Y-%m-%d') }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            // رسم بياني للمناصب
+            const positionsCtx = document.getElementById('positionsChart').getContext('2d');
+            new Chart(positionsCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: [
+                        {% for position, emps in positions.items() %}
+                        '{{ position }}'{{ ',' if not loop.last }}
+                        {% endfor %}
+                    ],
+                    datasets: [{
+                        data: [
+                            {% for position, emps in positions.items() %}
+                            {{ emps|length }}{{ ',' if not loop.last }}
+                            {% endfor %}
+                        ],
+                        backgroundColor: [
+                            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+                            '#9966FF', '#FF9F40', '#FF6384', '#C9CBCF'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+
+            // رسم بياني للرواتب
+            const salariesCtx = document.getElementById('salariesChart').getContext('2d');
+            new Chart(salariesCtx, {
+                type: 'bar',
+                data: {
+                    labels: [
+                        {% for employee in employees[:10] %}
+                        '{{ employee.name[:15] }}'{{ ',' if not loop.last }}
+                        {% endfor %}
+                    ],
+                    datasets: [{
+                        label: 'صافي الراتب (ر.س)',
+                        data: [
+                            {% for employee in employees[:10] %}
+                            {{ (employee.salary or 0) + (employee.allowances or 0) - (employee.deductions or 0) }}{{ ',' if not loop.last }}
+                            {% endfor %}
+                        ],
+                        backgroundColor: '#36A2EB'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        </script>
+    </body>
+    </html>
+    ''', employees=employees, total_employees=total_employees, active_employees=active_employees,
+         total_salaries=total_salaries, total_allowances=total_allowances, total_deductions=total_deductions,
+         positions=positions, recent_payrolls=recent_payrolls)
+
+# نظام طباعة الفواتير الاحترافي
+@app.route('/print_invoice/<int:sale_id>')
+@login_required
+def print_invoice(sale_id):
+    sale = SalesInvoice.query.get_or_404(sale_id)
+    items = SalesInvoiceItem.query.filter_by(invoice_id=sale_id).all()
+
+    # معلومات الشركة (يمكن تخصيصها)
+    company_info = {
+        'name': 'شركة المحاسبة الاحترافية',
+        'tax_number': '123456789012345',
+        'address': 'الرياض، المملكة العربية السعودية',
+        'phone': '+966 11 123 4567',
+        'email': 'info@company.com'
+    }
+
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>فاتورة مبيعات - {{ sale.invoice_number }}</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <style>
+            @media print {
+                .no-print { display: none !important; }
+                body { margin: 0; padding: 20px; }
+                .invoice-container { box-shadow: none !important; }
+            }
+
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background-color: #f8f9fa;
+            }
+
+            .invoice-container {
+                background: white;
+                border-radius: 10px;
+                box-shadow: 0 0 20px rgba(0,0,0,0.1);
+                padding: 30px;
+                margin: 20px auto;
+                max-width: 800px;
+            }
+
+            .company-header {
+                border-bottom: 3px solid #007bff;
+                padding-bottom: 20px;
+                margin-bottom: 30px;
+            }
+
+            .invoice-title {
+                background: linear-gradient(45deg, #007bff, #0056b3);
+                color: white;
+                padding: 15px;
+                border-radius: 10px;
+                text-align: center;
+                margin-bottom: 30px;
+            }
+
+            .info-section {
+                background-color: #f8f9fa;
+                padding: 15px;
+                border-radius: 8px;
+                margin-bottom: 20px;
+            }
+
+            .items-table {
+                border: 2px solid #dee2e6;
+                border-radius: 8px;
+                overflow: hidden;
+            }
+
+            .items-table th {
+                background-color: #007bff;
+                color: white;
+                font-weight: bold;
+                text-align: center;
+                padding: 12px;
+            }
+
+            .items-table td {
+                padding: 10px;
+                border-bottom: 1px solid #dee2e6;
+            }
+
+            .totals-section {
+                background-color: #e3f2fd;
+                padding: 20px;
+                border-radius: 8px;
+                border: 2px solid #2196f3;
+            }
+
+            .payment-method-badge {
+                display: inline-block;
+                padding: 8px 15px;
+                border-radius: 20px;
+                font-weight: bold;
+                color: white;
+            }
+
+            .qr-code {
+                width: 100px;
+                height: 100px;
+                background-color: #f0f0f0;
+                border: 2px dashed #ccc;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 12px;
+                color: #666;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="invoice-container">
+            <!-- رأس الشركة -->
+            <div class="company-header">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h2 class="fw-bold text-primary mb-2">{{ company_info.name }}</h2>
+                        <p class="mb-1"><i class="fas fa-map-marker-alt me-2"></i>{{ company_info.address }}</p>
+                        <p class="mb-1"><i class="fas fa-phone me-2"></i>{{ company_info.phone }}</p>
+                        <p class="mb-1"><i class="fas fa-envelope me-2"></i>{{ company_info.email }}</p>
+                        <p class="mb-0"><strong>الرقم الضريبي:</strong> {{ company_info.tax_number }}</p>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <div class="qr-code">
+                            رمز QR
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- عنوان الفاتورة -->
+            <div class="invoice-title">
+                <h3 class="mb-0">فاتورة مبيعات</h3>
+                <h4 class="mb-0">{{ sale.invoice_number }}</h4>
+            </div>
+
+            <!-- معلومات الفاتورة والعميل -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="info-section">
+                        <h6 class="fw-bold text-primary mb-3">معلومات الفاتورة</h6>
+                        <p class="mb-2"><strong>رقم الفاتورة:</strong> {{ sale.invoice_number }}</p>
+                        <p class="mb-2"><strong>التاريخ:</strong> {{ sale.date.strftime('%Y-%m-%d') }}</p>
+                        <p class="mb-2"><strong>طريقة الدفع:</strong>
+                            <span class="payment-method-badge" style="background-color:
+                                {% if sale.payment_method == 'cash' %}#28a745
+                                {% elif sale.payment_method == 'mada' %}#6f42c1
+                                {% elif sale.payment_method == 'visa' %}#007bff
+                                {% elif sale.payment_method == 'mastercard' %}#dc3545
+                                {% elif sale.payment_method == 'stc' %}#20c997
+                                {% elif sale.payment_method == 'gcc' %}#fd7e14
+                                {% else %}#6c757d{% endif %};">
+                                {% if sale.payment_method == 'cash' %}نقدي
+                                {% elif sale.payment_method == 'mada' %}مدى
+                                {% elif sale.payment_method == 'visa' %}فيزا
+                                {% elif sale.payment_method == 'mastercard' %}ماستركارد
+                                {% elif sale.payment_method == 'stc' %}STC Pay
+                                {% elif sale.payment_method == 'gcc' %}GCC Pay
+                                {% elif sale.payment_method == 'aks' %}أكس
+                                {% elif sale.payment_method == 'bank' %}تحويل بنكي
+                                {% else %}{{ sale.payment_method }}{% endif %}
+                            </span>
+                        </p>
+                        <p class="mb-0"><strong>الحالة:</strong>
+                            <span class="badge {% if sale.status == 'paid' %}bg-success{% elif sale.status == 'pending' %}bg-warning{% else %}bg-danger{% endif %}">
+                                {% if sale.status == 'paid' %}مدفوعة{% elif sale.status == 'pending' %}معلقة{% else %}ملغية{% endif %}
+                            </span>
+                        </p>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="info-section">
+                        <h6 class="fw-bold text-success mb-3">معلومات العميل</h6>
+                        {% if sale.customer %}
+                        <p class="mb-2"><strong>اسم العميل:</strong> {{ sale.customer.name }}</p>
+                        <p class="mb-2"><strong>الهاتف:</strong> {{ sale.customer.phone or '-' }}</p>
+                        <p class="mb-2"><strong>البريد الإلكتروني:</strong> {{ sale.customer.email or '-' }}</p>
+                        <p class="mb-0"><strong>العنوان:</strong> {{ sale.customer.address or '-' }}</p>
+                        {% else %}
+                        <p class="mb-0 text-muted">عميل نقدي</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- أصناف الفاتورة -->
+            <div class="mb-4">
+                <h6 class="fw-bold text-dark mb-3">تفاصيل الأصناف</h6>
+                <table class="table items-table mb-0">
+                    <thead>
+                        <tr>
+                            <th width="5%">#</th>
+                            <th width="30%">اسم الصنف</th>
+                            <th width="25%">الوصف</th>
+                            <th width="10%">الكمية</th>
+                            <th width="15%">سعر الوحدة</th>
+                            <th width="15%">الإجمالي</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td class="text-center">{{ loop.index }}</td>
+                            <td><strong>{{ item.product_name }}</strong></td>
+                            <td>{{ item.description or '-' }}</td>
+                            <td class="text-center">{{ "%.3f"|format(item.quantity) }}</td>
+                            <td class="text-end">{{ "%.2f"|format(item.unit_price) }} ر.س</td>
+                            <td class="text-end fw-bold">{{ "%.2f"|format(item.total_price) }} ر.س</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ملخص المبالغ -->
+            <div class="row">
+                <div class="col-md-6">
+                    {% if sale.notes %}
+                    <div class="info-section">
+                        <h6 class="fw-bold text-secondary mb-2">ملاحظات</h6>
+                        <p class="mb-0">{{ sale.notes }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <div class="totals-section">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>المبلغ الفرعي:</span>
+                            <span class="fw-bold">{{ "%.2f"|format(sale.subtotal) }} ر.س</span>
+                        </div>
+                        {% if sale.has_tax %}
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>الضريبة ({{ "%.1f"|format(sale.tax_rate) }}%):</span>
+                            <span class="fw-bold">{{ "%.2f"|format(sale.tax_amount) }} ر.س</span>
+                        </div>
+                        {% endif %}
+                        <hr class="my-2">
+                        <div class="d-flex justify-content-between">
+                            <span class="fs-5 fw-bold">الإجمالي:</span>
+                            <span class="fs-4 fw-bold text-primary">{{ "%.2f"|format(sale.total) }} ر.س</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- تذييل الفاتورة -->
+            <div class="text-center mt-4 pt-4 border-top">
+                <p class="text-muted mb-2">شكراً لتعاملكم معنا</p>
+                <p class="small text-muted mb-0">هذه فاتورة إلكترونية صادرة من نظام المحاسبة الاحترافي</p>
+            </div>
+
+            <!-- أزرار الطباعة -->
+            <div class="text-center mt-4 no-print">
+                <button class="btn btn-primary btn-lg me-2" onclick="window.print()">
+                    <i class="fas fa-print me-2"></i>طباعة الفاتورة
+                </button>
+                <button class="btn btn-secondary btn-lg" onclick="window.close()">
+                    <i class="fas fa-times me-2"></i>إغلاق
+                </button>
+            </div>
+        </div>
+
+        <script>
+            // طباعة تلقائية عند فتح الصفحة
+            window.onload = function() {
+                // يمكن تفعيل الطباعة التلقائية إذا رغبت
+                // window.print();
+            }
+        </script>
+    </body>
+    </html>
+    ''', sale=sale, items=items, company_info=company_info)
+
+@app.route('/print_purchase/<int:purchase_id>')
+@login_required
+def print_purchase(purchase_id):
+    purchase = PurchaseInvoice.query.get_or_404(purchase_id)
+    items = PurchaseInvoiceItem.query.filter_by(invoice_id=purchase_id).all()
+
+    # معلومات الشركة
+    company_info = {
+        'name': 'شركة المحاسبة الاحترافية',
+        'tax_number': '123456789012345',
+        'address': 'الرياض، المملكة العربية السعودية',
+        'phone': '+966 11 123 4567',
+        'email': 'info@company.com'
+    }
+
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>فاتورة مشتريات - {{ purchase.invoice_number }}</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <style>
+            @media print {
+                .no-print { display: none !important; }
+                body { margin: 0; padding: 20px; }
+                .invoice-container { box-shadow: none !important; }
+            }
+
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background-color: #f8f9fa;
+            }
+
+            .invoice-container {
+                background: white;
+                border-radius: 10px;
+                box-shadow: 0 0 20px rgba(0,0,0,0.1);
+                padding: 30px;
+                margin: 20px auto;
+                max-width: 800px;
+            }
+
+            .company-header {
+                border-bottom: 3px solid #6c757d;
+                padding-bottom: 20px;
+                margin-bottom: 30px;
+            }
+
+            .invoice-title {
+                background: linear-gradient(45deg, #6c757d, #495057);
+                color: white;
+                padding: 15px;
+                border-radius: 10px;
+                text-align: center;
+                margin-bottom: 30px;
+            }
+
+            .info-section {
+                background-color: #f8f9fa;
+                padding: 15px;
+                border-radius: 8px;
+                margin-bottom: 20px;
+            }
+
+            .items-table {
+                border: 2px solid #dee2e6;
+                border-radius: 8px;
+                overflow: hidden;
+            }
+
+            .items-table th {
+                background-color: #6c757d;
+                color: white;
+                font-weight: bold;
+                text-align: center;
+                padding: 12px;
+            }
+
+            .items-table td {
+                padding: 10px;
+                border-bottom: 1px solid #dee2e6;
+            }
+
+            .totals-section {
+                background-color: #f8f9fa;
+                padding: 20px;
+                border-radius: 8px;
+                border: 2px solid #6c757d;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="invoice-container">
+            <!-- رأس الشركة -->
+            <div class="company-header">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h2 class="fw-bold text-secondary mb-2">{{ company_info.name }}</h2>
+                        <p class="mb-1"><i class="fas fa-map-marker-alt me-2"></i>{{ company_info.address }}</p>
+                        <p class="mb-1"><i class="fas fa-phone me-2"></i>{{ company_info.phone }}</p>
+                        <p class="mb-1"><i class="fas fa-envelope me-2"></i>{{ company_info.email }}</p>
+                        <p class="mb-0"><strong>الرقم الضريبي:</strong> {{ company_info.tax_number }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- عنوان الفاتورة -->
+            <div class="invoice-title">
+                <h3 class="mb-0">فاتورة مشتريات</h3>
+                <h4 class="mb-0">{{ purchase.invoice_number }}</h4>
+            </div>
+
+            <!-- معلومات الفاتورة والمورد -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="info-section">
+                        <h6 class="fw-bold text-secondary mb-3">معلومات الفاتورة</h6>
+                        <p class="mb-2"><strong>رقم الفاتورة:</strong> {{ purchase.invoice_number }}</p>
+                        <p class="mb-2"><strong>التاريخ:</strong> {{ purchase.date.strftime('%Y-%m-%d') }}</p>
+                        <p class="mb-2"><strong>طريقة الدفع:</strong>
+                            <span class="badge bg-secondary">
+                                {% if purchase.payment_method == 'cash' %}نقدي
+                                {% elif purchase.payment_method == 'mada' %}مدى
+                                {% elif purchase.payment_method == 'visa' %}فيزا
+                                {% elif purchase.payment_method == 'mastercard' %}ماستركارد
+                                {% elif purchase.payment_method == 'stc' %}STC Pay
+                                {% elif purchase.payment_method == 'gcc' %}GCC Pay
+                                {% elif purchase.payment_method == 'aks' %}أكس
+                                {% elif purchase.payment_method == 'bank' %}تحويل بنكي
+                                {% else %}{{ purchase.payment_method }}{% endif %}
+                            </span>
+                        </p>
+                        <p class="mb-0"><strong>الحالة:</strong>
+                            <span class="badge {% if purchase.status == 'paid' %}bg-success{% elif purchase.status == 'pending' %}bg-warning{% else %}bg-danger{% endif %}">
+                                {% if purchase.status == 'paid' %}مدفوعة{% elif purchase.status == 'pending' %}معلقة{% else %}ملغية{% endif %}
+                            </span>
+                        </p>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="info-section">
+                        <h6 class="fw-bold text-info mb-3">معلومات المورد</h6>
+                        <p class="mb-2"><strong>اسم المورد:</strong> {{ purchase.supplier.name }}</p>
+                        <p class="mb-2"><strong>الهاتف:</strong> {{ purchase.supplier.phone or '-' }}</p>
+                        <p class="mb-2"><strong>البريد الإلكتروني:</strong> {{ purchase.supplier.email or '-' }}</p>
+                        <p class="mb-0"><strong>العنوان:</strong> {{ purchase.supplier.address or '-' }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- أصناف الفاتورة -->
+            <div class="mb-4">
+                <h6 class="fw-bold text-dark mb-3">تفاصيل الأصناف</h6>
+                <table class="table items-table mb-0">
+                    <thead>
+                        <tr>
+                            <th width="5%">#</th>
+                            <th width="30%">اسم الصنف</th>
+                            <th width="25%">الوصف</th>
+                            <th width="10%">الكمية</th>
+                            <th width="15%">سعر الوحدة</th>
+                            <th width="15%">الإجمالي</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td class="text-center">{{ loop.index }}</td>
+                            <td><strong>{{ item.product_name }}</strong></td>
+                            <td>{{ item.description or '-' }}</td>
+                            <td class="text-center">{{ "%.3f"|format(item.quantity) }}</td>
+                            <td class="text-end">{{ "%.2f"|format(item.unit_price) }} ر.س</td>
+                            <td class="text-end fw-bold">{{ "%.2f"|format(item.total_price) }} ر.س</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ملخص المبالغ -->
+            <div class="row">
+                <div class="col-md-6">
+                    {% if purchase.notes %}
+                    <div class="info-section">
+                        <h6 class="fw-bold text-secondary mb-2">ملاحظات</h6>
+                        <p class="mb-0">{{ purchase.notes }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <div class="totals-section">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>المبلغ الفرعي:</span>
+                            <span class="fw-bold">{{ "%.2f"|format(purchase.subtotal) }} ر.س</span>
+                        </div>
+                        {% if purchase.has_tax %}
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>الضريبة ({{ "%.1f"|format(purchase.tax_rate) }}%):</span>
+                            <span class="fw-bold">{{ "%.2f"|format(purchase.tax_amount) }} ر.س</span>
+                        </div>
+                        {% endif %}
+                        <hr class="my-2">
+                        <div class="d-flex justify-content-between">
+                            <span class="fs-5 fw-bold">الإجمالي:</span>
+                            <span class="fs-4 fw-bold text-secondary">{{ "%.2f"|format(purchase.total) }} ر.س</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- تذييل الفاتورة -->
+            <div class="text-center mt-4 pt-4 border-top">
+                <p class="text-muted mb-2">فاتورة مشتريات معتمدة</p>
+                <p class="small text-muted mb-0">هذه فاتورة إلكترونية صادرة من نظام المحاسبة الاحترافي</p>
+            </div>
+
+            <!-- أزرار الطباعة -->
+            <div class="text-center mt-4 no-print">
+                <button class="btn btn-secondary btn-lg me-2" onclick="window.print()">
+                    <i class="fas fa-print me-2"></i>طباعة الفاتورة
+                </button>
+                <button class="btn btn-light btn-lg" onclick="window.close()">
+                    <i class="fas fa-times me-2"></i>إغلاق
+                </button>
+            </div>
+        </div>
+    </body>
+    </html>
+    ''', purchase=purchase, items=items, company_info=company_info)
 
 @app.route('/expenses')
 @login_required
@@ -3082,6 +4615,45 @@ def employees():
         </div>
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            // وظائف إدارة الموظفين
+            function viewEmployee(employeeId) {
+                window.location.href = '/view_employee/' + employeeId;
+            }
+
+            function editEmployee(employeeId) {
+                alert('تعديل الموظف رقم: ' + employeeId + ' - قيد التطوير');
+                // يمكن إضافة modal للتعديل لاحقاً
+            }
+
+            function deleteEmployee(employeeId, employeeName) {
+                if (confirm('هل أنت متأكد من حذف الموظف: ' + employeeName + '؟')) {
+                    fetch('/delete_employee/' + employeeId, {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('تم حذف الموظف بنجاح');
+                            location.reload();
+                        } else {
+                            alert('حدث خطأ أثناء الحذف: ' + (data.message || 'خطأ غير معروف'));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('حدث خطأ أثناء الحذف');
+                    });
+                }
+            }
+
+            function generatePayroll(employeeId) {
+                window.location.href = '/generate_payroll/' + employeeId;
+            }
+        </script>
     </body>
     </html>
     ''', employees=employees, active_employees=active_employees, total_salaries=total_salaries)
@@ -4184,20 +5756,37 @@ def expenses_report():
                 height: 400px;
                 margin: 20px 0;
             }
+            @media print {
+                .no-print { display: none !important; }
+                body { background: white !important; }
+                .stat-card { box-shadow: none !important; border: 1px solid #ddd !important; }
+            }
         </style>
     </head>
     <body>
-        <nav class="navbar navbar-expand-lg navbar-dark">
+        <nav class="navbar navbar-expand-lg navbar-dark no-print">
             <div class="container">
                 <a class="navbar-brand" href="{{ url_for('dashboard') }}">
                     <i class="fas fa-calculator me-2"></i>نظام المحاسبة الاحترافي
                 </a>
                 <div class="navbar-nav ms-auto">
+                    <button class="btn btn-light me-2" onclick="window.print()">
+                        <i class="fas fa-print me-1"></i>طباعة
+                    </button>
+                    <div class="dropdown me-2">
+                        <button class="btn btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-filter me-1"></i>فلترة
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="?period=weekly">أسبوعي</a></li>
+                            <li><a class="dropdown-item" href="?period=monthly">شهري</a></li>
+                            <li><a class="dropdown-item" href="?period=yearly">سنوي</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('expenses_report') }}">جميع الفترات</a></li>
+                        </ul>
+                    </div>
                     <a class="nav-link" href="{{ url_for('reports') }}">
                         <i class="fas fa-arrow-right me-1"></i>رجوع للتقارير
-                    </a>
-                    <a class="nav-link" href="{{ url_for('dashboard') }}">
-                        <i class="fas fa-home me-1"></i>الرئيسية
                     </a>
                 </div>
             </div>
@@ -4449,20 +6038,37 @@ def inventory_report():
             }
             .low-stock { background-color: #fff3cd !important; }
             .out-of-stock { background-color: #f8d7da !important; }
+            @media print {
+                .no-print { display: none !important; }
+                body { background: white !important; }
+                .stat-card { box-shadow: none !important; border: 1px solid #ddd !important; }
+            }
         </style>
     </head>
     <body>
-        <nav class="navbar navbar-expand-lg navbar-dark">
+        <nav class="navbar navbar-expand-lg navbar-dark no-print">
             <div class="container">
                 <a class="navbar-brand" href="{{ url_for('dashboard') }}">
                     <i class="fas fa-calculator me-2"></i>نظام المحاسبة الاحترافي
                 </a>
                 <div class="navbar-nav ms-auto">
+                    <button class="btn btn-light me-2" onclick="window.print()">
+                        <i class="fas fa-print me-1"></i>طباعة
+                    </button>
+                    <div class="dropdown me-2">
+                        <button class="btn btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-filter me-1"></i>فلترة
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="?filter=low_stock">مخزون منخفض</a></li>
+                            <li><a class="dropdown-item" href="?filter=out_of_stock">نفد المخزون</a></li>
+                            <li><a class="dropdown-item" href="?filter=available">متوفر</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('inventory_report') }}">جميع المنتجات</a></li>
+                        </ul>
+                    </div>
                     <a class="nav-link" href="{{ url_for('reports') }}">
                         <i class="fas fa-arrow-right me-1"></i>رجوع للتقارير
-                    </a>
-                    <a class="nav-link" href="{{ url_for('dashboard') }}">
-                        <i class="fas fa-home me-1"></i>الرئيسية
                     </a>
                 </div>
             </div>

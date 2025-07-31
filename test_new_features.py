@@ -187,26 +187,106 @@ class NewFeaturesTest:
             except Exception as e:
                 self.log_test(f"الوصول لـ {name}", False, str(e))
     
+    def test_purchase_invoice_with_items(self):
+        """اختبار فاتورة مشتريات مع أصناف"""
+        try:
+            # بيانات فاتورة المشتريات مع الأصناف
+            invoice_data = {
+                'invoice_number': f'PTEST-{datetime.now().strftime("%Y%m%d%H%M%S")}',
+                'supplier_id': '1',  # يجب أن يكون هناك مورد
+                'payment_method': 'bank',
+                'has_tax': 'on',
+                'tax_rate': '15',
+                'subtotal': '2000.00',
+                'tax_amount': '300.00',
+                'total': '2300.00',
+                'notes': 'فاتورة مشتريات اختبار للأصناف الجديدة',
+                # الأصناف
+                'items[0][name]': 'مواد خام اختبار 1',
+                'items[0][description]': 'وصف المواد الخام الأولى',
+                'items[0][quantity]': '5',
+                'items[0][price]': '200.00',
+                'items[0][total]': '1000.00',
+                'items[1][name]': 'مواد خام اختبار 2',
+                'items[1][description]': 'وصف المواد الخام الثانية',
+                'items[1][quantity]': '2',
+                'items[1][price]': '500.00',
+                'items[1][total]': '1000.00'
+            }
+
+            response = self.session.post(f"{self.base_url}/add_purchase", data=invoice_data)
+            success = response.status_code in [200, 302]
+            self.log_test("إنشاء فاتورة مشتريات مع أصناف", success, f"كود الاستجابة: {response.status_code}")
+            return success
+        except Exception as e:
+            self.log_test("إنشاء فاتورة مشتريات مع أصناف", False, str(e))
+            return False
+
+    def test_employee_functions(self):
+        """اختبار وظائف الموظفين الجديدة"""
+        try:
+            # اختبار عرض ملف الموظف
+            response = self.session.get(f"{self.base_url}/view_employee/1")
+            view_success = response.status_code == 200
+            self.log_test("عرض ملف الموظف", view_success)
+
+            # اختبار إنشاء كشف راتب
+            response = self.session.get(f"{self.base_url}/generate_payroll/1")
+            payroll_success = response.status_code == 200
+            self.log_test("صفحة إنشاء كشف الراتب", payroll_success)
+
+            return view_success and payroll_success
+        except Exception as e:
+            self.log_test("وظائف الموظفين", False, str(e))
+            return False
+
+    def test_print_functions(self):
+        """اختبار وظائف الطباعة"""
+        try:
+            # اختبار طباعة فاتورة مبيعات
+            response = self.session.get(f"{self.base_url}/print_invoice/1")
+            invoice_print = response.status_code == 200
+            self.log_test("طباعة فاتورة المبيعات", invoice_print)
+
+            # اختبار طباعة فاتورة مشتريات
+            response = self.session.get(f"{self.base_url}/print_purchase/1")
+            purchase_print = response.status_code == 200
+            self.log_test("طباعة فاتورة المشتريات", purchase_print)
+
+            return invoice_print and purchase_print
+        except Exception as e:
+            self.log_test("وظائف الطباعة", False, str(e))
+            return False
+
     def run_all_tests(self):
         """تشغيل جميع الاختبارات"""
-        print("🚀 بدء اختبار الميزات الجديدة")
+        print("🚀 بدء اختبار الميزات الجديدة والمحسنة")
         print("=" * 60)
-        
+
         # تسجيل الدخول أولاً
         if not self.login():
             print("❌ فشل في تسجيل الدخول - توقف الاختبار")
             return
-        
+
         print("\n📋 اختبار فواتير المبيعات الجديدة:")
         print("-" * 40)
         self.test_sales_invoice_with_items()
         self.test_payment_methods()
         self.test_tax_control()
-        
+
+        print("\n🛒 اختبار فواتير المشتريات المحسنة:")
+        print("-" * 40)
+        self.test_purchase_invoice_with_items()
+
         print("\n👥 اختبار نظام الموظفين المحسن:")
         print("-" * 40)
         self.test_employee_with_payroll_settings()
-        
+        self.test_employee_functions()
+
+        print("\n🖨️ اختبار وظائف الطباعة:")
+        print("-" * 40)
+        self.test_print_functions()
+
         print("\n📊 اختبار التقارير المطورة:")
         print("-" * 40)
         self.test_reports_access()
