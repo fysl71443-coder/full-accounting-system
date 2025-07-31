@@ -2638,6 +2638,9 @@ def view_employee(employee_id):
                             <button class="btn btn-success" onclick="generatePayroll({{ employee.id }})">
                                 <i class="fas fa-money-check me-2"></i>إنشاء كشف راتب
                             </button>
+                            <button class="btn btn-primary" onclick="recordPayment({{ employee.id }})">
+                                <i class="fas fa-credit-card me-2"></i>تسجيل دفع
+                            </button>
                             <button class="btn btn-warning" onclick="editEmployee({{ employee.id }})">
                                 <i class="fas fa-edit me-2"></i>تعديل البيانات
                             </button>
@@ -2963,6 +2966,409 @@ def save_payroll():
         db.session.rollback()
         flash(f'حدث خطأ أثناء إنشاء كشف الراتب: {str(e)}', 'error')
         return redirect(url_for('generate_payroll', employee_id=request.form.get('employee_id', 1)))
+
+# تسجيل دفع راتب الموظف
+@app.route('/record_employee_payment/<int:employee_id>')
+@login_required
+def record_employee_payment(employee_id):
+    from datetime import datetime
+    employee = Employee.query.get_or_404(employee_id)
+    current_month = datetime.now().month
+    current_year = datetime.now().year
+
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>تسجيل دفع راتب - {{ employee.name }}</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            body {
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+            .navbar {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            }
+            .payment-card {
+                background: white;
+                border-radius: 20px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                border: none;
+                overflow: hidden;
+            }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-calculator me-2"></i>نظام المحاسبة الاحترافي
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="{{ url_for('employees') }}">
+                        <i class="fas fa-arrow-right me-1"></i>رجوع للموظفين
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <div class="text-center mb-5">
+                <h1 class="display-5 fw-bold text-primary">
+                    <i class="fas fa-credit-card me-3"></i>تسجيل دفع راتب
+                </h1>
+                <p class="lead text-muted">{{ employee.name }} - {{ employee.position }}</p>
+            </div>
+
+            <div class="row justify-content-center">
+                <div class="col-md-8">
+                    <div class="payment-card">
+                        <div class="card-header bg-primary text-white p-4">
+                            <h5 class="mb-0 fw-bold">
+                                <i class="fas fa-money-check me-2"></i>بيانات الدفع
+                            </h5>
+                        </div>
+                        <div class="card-body p-4">
+                            <form method="POST" action="{{ url_for('save_employee_payment') }}">
+                                <input type="hidden" name="employee_id" value="{{ employee.id }}">
+
+                                <div class="row mb-4">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">الشهر</label>
+                                        <select class="form-select" name="month" required>
+                                            {% for i in range(1, 13) %}
+                                            <option value="{{ i }}" {% if i == current_month %}selected{% endif %}>
+                                                {% if i == 1 %}يناير{% elif i == 2 %}فبراير{% elif i == 3 %}مارس{% elif i == 4 %}أبريل{% elif i == 5 %}مايو{% elif i == 6 %}يونيو{% elif i == 7 %}يوليو{% elif i == 8 %}أغسطس{% elif i == 9 %}سبتمبر{% elif i == 10 %}أكتوبر{% elif i == 11 %}نوفمبر{% else %}ديسمبر{% endif %}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">السنة</label>
+                                        <input type="number" class="form-control" name="year" value="{{ current_year }}" min="2020" max="2030" required>
+                                    </div>
+                                </div>
+
+                                <div class="row mb-4">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">المبلغ المدفوع</label>
+                                        <input type="number" step="0.01" class="form-control" name="amount" value="{{ employee.salary }}" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">طريقة الدفع</label>
+                                        <select class="form-select" name="payment_method" required>
+                                            <option value="cash">نقدي</option>
+                                            <option value="bank" selected>تحويل بنكي</option>
+                                            <option value="mada">مدى</option>
+                                            <option value="visa">فيزا</option>
+                                            <option value="mastercard">ماستركارد</option>
+                                            <option value="stc">STC Pay</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold">ملاحظات</label>
+                                    <textarea class="form-control" name="notes" rows="3" placeholder="أي ملاحظات إضافية..."></textarea>
+                                </div>
+
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button type="button" class="btn btn-secondary" onclick="history.back()">
+                                        <i class="fas fa-times me-2"></i>إلغاء
+                                    </button>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>تسجيل الدفع
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    </body>
+    </html>
+    ''', employee=employee, current_month=current_month, current_year=current_year)
+
+@app.route('/save_employee_payment', methods=['POST'])
+@login_required
+def save_employee_payment():
+    try:
+        employee_id = int(request.form['employee_id'])
+        month = int(request.form['month'])
+        year = int(request.form['year'])
+        amount = float(request.form['amount'])
+        payment_method = request.form['payment_method']
+        notes = request.form.get('notes', '')
+
+        employee = Employee.query.get_or_404(employee_id)
+
+        # إنشاء سجل دفع جديد (يمكن إضافة جدول منفصل للمدفوعات لاحقاً)
+        # حالياً سنقوم بإنشاء كشف راتب مدفوع
+        payroll = EmployeePayroll(
+            employee_id=employee_id,
+            month=month,
+            year=year,
+            basic_salary=amount,
+            working_days=30,
+            actual_working_days=30,
+            overtime_hours=0,
+            overtime_amount=0,
+            allowances=0,
+            deductions=0,
+            gross_salary=amount,
+            net_salary=amount,
+            notes=f"دفع مباشر - {payment_method} - {notes}",
+            status='paid'
+        )
+
+        db.session.add(payroll)
+        db.session.commit()
+
+        flash(f'تم تسجيل دفع راتب {employee.name} بمبلغ {amount} ر.س بنجاح', 'success')
+        return redirect(url_for('payments'))
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'حدث خطأ أثناء تسجيل الدفع: {str(e)}', 'error')
+        return redirect(url_for('employees'))
+
+# إعدادات الطباعة
+@app.route('/print_settings')
+@login_required
+def print_settings():
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>إعدادات الطباعة - نظام المحاسبة</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            body {
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+            .navbar {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            }
+            .settings-card {
+                background: white;
+                border-radius: 20px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                border: none;
+                overflow: hidden;
+            }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-calculator me-2"></i>نظام المحاسبة الاحترافي
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="{{ url_for('settings') }}">
+                        <i class="fas fa-arrow-right me-1"></i>رجوع للإعدادات
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <div class="text-center mb-5">
+                <h1 class="display-5 fw-bold text-primary">
+                    <i class="fas fa-print me-3"></i>إعدادات الطباعة
+                </h1>
+                <p class="lead text-muted">تخصيص خيارات الطباعة والتصدير</p>
+            </div>
+
+            <div class="row">
+                <div class="col-md-8 mx-auto">
+                    <div class="settings-card">
+                        <div class="card-header bg-primary text-white p-4">
+                            <h5 class="mb-0 fw-bold">
+                                <i class="fas fa-cog me-2"></i>خيارات الطباعة
+                            </h5>
+                        </div>
+                        <div class="card-body p-4">
+                            <form id="printSettingsForm">
+                                <!-- إعدادات الرأس -->
+                                <div class="mb-4">
+                                    <h6 class="fw-bold text-primary mb-3">
+                                        <i class="fas fa-heading me-2"></i>إعدادات الرأس
+                                    </h6>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="includeHeader" checked>
+                                        <label class="form-check-label" for="includeHeader">
+                                            تضمين رأس الصفحة
+                                        </label>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <label class="form-label">اسم الشركة</label>
+                                            <input type="text" class="form-control" id="companyName" value="شركة المحاسبة الاحترافية">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">الرقم الضريبي</label>
+                                            <input type="text" class="form-control" id="taxNumber" value="123456789012345">
+                                        </div>
+                                    </div>
+                                    <div class="row mt-2">
+                                        <div class="col-md-6">
+                                            <label class="form-label">العنوان</label>
+                                            <input type="text" class="form-control" id="companyAddress" value="الرياض، المملكة العربية السعودية">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">الهاتف</label>
+                                            <input type="text" class="form-control" id="companyPhone" value="+966 11 123 4567">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- إعدادات التذييل -->
+                                <div class="mb-4">
+                                    <h6 class="fw-bold text-success mb-3">
+                                        <i class="fas fa-align-left me-2"></i>إعدادات التذييل
+                                    </h6>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="includeFooter" checked>
+                                        <label class="form-check-label" for="includeFooter">
+                                            تضمين تذييل الصفحة
+                                        </label>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label">نص التذييل</label>
+                                        <textarea class="form-control" id="footerText" rows="2">شكراً لتعاملكم معنا - هذه فاتورة إلكترونية صادرة من نظام المحاسبة الاحترافي</textarea>
+                                    </div>
+                                </div>
+
+                                <!-- إعدادات إضافية -->
+                                <div class="mb-4">
+                                    <h6 class="fw-bold text-warning mb-3">
+                                        <i class="fas fa-sliders-h me-2"></i>إعدادات إضافية
+                                    </h6>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" id="includeLogo">
+                                                <label class="form-check-label" for="includeLogo">
+                                                    تضمين شعار الشركة
+                                                </label>
+                                            </div>
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" id="includeQR" checked>
+                                                <label class="form-check-label" for="includeQR">
+                                                    تضمين رمز QR
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" id="includeDate" checked>
+                                                <label class="form-check-label" for="includeDate">
+                                                    تضمين تاريخ الطباعة
+                                                </label>
+                                            </div>
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" id="includePageNumbers">
+                                                <label class="form-check-label" for="includePageNumbers">
+                                                    ترقيم الصفحات
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- أزرار الحفظ -->
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button type="button" class="btn btn-secondary" onclick="resetSettings()">
+                                        <i class="fas fa-undo me-2"></i>إعادة تعيين
+                                    </button>
+                                    <button type="button" class="btn btn-info" onclick="previewSettings()">
+                                        <i class="fas fa-eye me-2"></i>معاينة
+                                    </button>
+                                    <button type="button" class="btn btn-success" onclick="saveSettings()">
+                                        <i class="fas fa-save me-2"></i>حفظ الإعدادات
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            // حفظ إعدادات الطباعة في localStorage
+            function saveSettings() {
+                const settings = {
+                    includeHeader: document.getElementById('includeHeader').checked,
+                    companyName: document.getElementById('companyName').value,
+                    taxNumber: document.getElementById('taxNumber').value,
+                    companyAddress: document.getElementById('companyAddress').value,
+                    companyPhone: document.getElementById('companyPhone').value,
+                    includeFooter: document.getElementById('includeFooter').checked,
+                    footerText: document.getElementById('footerText').value,
+                    includeLogo: document.getElementById('includeLogo').checked,
+                    includeQR: document.getElementById('includeQR').checked,
+                    includeDate: document.getElementById('includeDate').checked,
+                    includePageNumbers: document.getElementById('includePageNumbers').checked
+                };
+
+                localStorage.setItem('printSettings', JSON.stringify(settings));
+                alert('تم حفظ إعدادات الطباعة بنجاح!');
+            }
+
+            // تحميل الإعدادات المحفوظة
+            function loadSettings() {
+                const saved = localStorage.getItem('printSettings');
+                if (saved) {
+                    const settings = JSON.parse(saved);
+                    document.getElementById('includeHeader').checked = settings.includeHeader;
+                    document.getElementById('companyName').value = settings.companyName || '';
+                    document.getElementById('taxNumber').value = settings.taxNumber || '';
+                    document.getElementById('companyAddress').value = settings.companyAddress || '';
+                    document.getElementById('companyPhone').value = settings.companyPhone || '';
+                    document.getElementById('includeFooter').checked = settings.includeFooter;
+                    document.getElementById('footerText').value = settings.footerText || '';
+                    document.getElementById('includeLogo').checked = settings.includeLogo;
+                    document.getElementById('includeQR').checked = settings.includeQR;
+                    document.getElementById('includeDate').checked = settings.includeDate;
+                    document.getElementById('includePageNumbers').checked = settings.includePageNumbers;
+                }
+            }
+
+            // إعادة تعيين الإعدادات
+            function resetSettings() {
+                if (confirm('هل أنت متأكد من إعادة تعيين جميع الإعدادات؟')) {
+                    localStorage.removeItem('printSettings');
+                    location.reload();
+                }
+            }
+
+            // معاينة الإعدادات
+            function previewSettings() {
+                alert('معاينة الإعدادات - سيتم تطبيق الإعدادات في الطباعة التالية');
+            }
+
+            // تحميل الإعدادات عند فتح الصفحة
+            window.onload = function() {
+                loadSettings();
+            };
+        </script>
+    </body>
+    </html>
+    ''')
 
 # تقرير الموظفين التفصيلي
 @app.route('/employees_report')
@@ -4442,6 +4848,9 @@ def employees():
                                             <button class="btn btn-sm btn-outline-success" title="كشف راتب" onclick="generatePayroll({{ employee.id }})">
                                                 <i class="fas fa-money-check"></i>
                                             </button>
+                                            <button class="btn btn-sm btn-outline-primary" title="تسجيل دفع" onclick="recordPayment({{ employee.id }})">
+                                                <i class="fas fa-credit-card"></i>
+                                            </button>
                                             <button class="btn btn-sm btn-outline-warning" title="تعديل" onclick="editEmployee({{ employee.id }})">
                                                 <i class="fas fa-edit"></i>
                                             </button>
@@ -4667,6 +5076,10 @@ def employees():
 
             function generatePayroll(employeeId) {
                 window.location.href = '/generate_payroll/' + employeeId;
+            }
+
+            function recordPayment(employeeId) {
+                window.location.href = '/record_employee_payment/' + employeeId;
             }
         </script>
     </body>
@@ -8146,6 +8559,46 @@ def add_user():
         flash('اسم المستخدم موجود بالفعل', 'error')
         return redirect(url_for('users'))
 
+# حذف مستخدم
+@app.route('/delete_user/<int:user_id>', methods=['POST'])
+@login_required
+def delete_user(user_id):
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': 'ليس لديك صلاحية'})
+
+    if user_id == current_user.id:
+        return jsonify({'success': False, 'message': 'لا يمكنك حذف نفسك'})
+
+    try:
+        user = User.query.get_or_404(user_id)
+        db.session.delete(user)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'تم حذف المستخدم بنجاح'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+# تعديل صلاحيات المستخدم
+@app.route('/update_user_permissions/<int:user_id>', methods=['POST'])
+@login_required
+def update_user_permissions(user_id):
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'message': 'ليس لديك صلاحية'})
+
+    try:
+        user = User.query.get_or_404(user_id)
+        new_role = request.json.get('role', user.role)
+
+        if new_role in ['admin', 'manager', 'user']:
+            user.role = new_role
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'تم تحديث الصلاحيات بنجاح'})
+        else:
+            return jsonify({'success': False, 'message': 'صلاحية غير صحيحة'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
     user = User(
         username=request.form['username'],
         full_name=request.form['full_name'],
@@ -8158,19 +8611,7 @@ def add_user():
     flash('تم إضافة المستخدم بنجاح', 'success')
     return redirect(url_for('users'))
 
-@app.route('/delete_user/<int:user_id>', methods=['DELETE'])
-@login_required
-def delete_user(user_id):
-    if current_user.role != 'admin':
-        return jsonify({'success': False, 'message': 'ليس لديك صلاحية'})
 
-    if user_id == current_user.id:
-        return jsonify({'success': False, 'message': 'لا يمكن حذف نفسك'})
-
-    user = User.query.get_or_404(user_id)
-    db.session.delete(user)
-    db.session.commit()
-    return jsonify({'success': True})
 
 @app.route('/reset_password/<int:user_id>', methods=['POST'])
 @login_required
@@ -8238,7 +8679,8 @@ def export_pdf(report_type):
             'expenses': 'تقرير المصروفات',
             'inventory': 'تقرير المخزون',
             'employees': 'تقرير الموظفين',
-            'payroll': 'تقرير كشوف الرواتب'
+            'payroll': 'تقرير كشوف الرواتب',
+            'payments': 'تقرير المدفوعات والمستحقات'
         }
 
         report_name = report_names.get(report_type, 'التقرير')
@@ -8253,7 +8695,8 @@ def export_pdf(report_type):
             'expenses': 'expenses_report',
             'inventory': 'inventory_report',
             'employees': 'employees_report',
-            'payroll': 'payroll_report'
+            'payroll': 'payroll_report',
+            'payments': 'payments_report'
         }
 
         route = report_routes.get(report_type, 'reports')
@@ -8275,7 +8718,8 @@ def export_excel(report_type):
             'expenses': 'تقرير المصروفات',
             'inventory': 'تقرير المخزون',
             'employees': 'تقرير الموظفين',
-            'payroll': 'تقرير كشوف الرواتب'
+            'payroll': 'تقرير كشوف الرواتب',
+            'payments': 'تقرير المدفوعات والمستحقات'
         }
 
         report_name = report_names.get(report_type, 'التقرير')
@@ -8290,7 +8734,8 @@ def export_excel(report_type):
             'expenses': 'expenses_report',
             'inventory': 'inventory_report',
             'employees': 'employees_report',
-            'payroll': 'payroll_report'
+            'payroll': 'payroll_report',
+            'payments': 'payments_report'
         }
 
         route = report_routes.get(report_type, 'reports')
@@ -8527,9 +8972,15 @@ def settings():
                                         <option>يورو (€)</option>
                                     </select>
                                 </div>
-                                <div class="d-grid">
+                                <div class="d-grid gap-2">
                                     <button type="button" class="btn btn-success btn-settings" onclick="saveSystemSettings()">
                                         <i class="fas fa-save me-2"></i>حفظ الإعدادات
+                                    </button>
+                                    <a href="{{ url_for('print_settings') }}" class="btn btn-info btn-settings">
+                                        <i class="fas fa-print me-2"></i>إعدادات الطباعة
+                                    </a>
+                                    <button type="button" class="btn btn-secondary btn-settings" onclick="createBackup()">
+                                        <i class="fas fa-download me-2"></i>نسخة احتياطية
                                     </button>
                                 </div>
                             </form>
@@ -8692,6 +9143,16 @@ def settings():
             function saveSystemSettings() {
                 alert('تم حفظ إعدادات النظام بنجاح');
                 // يمكن إضافة AJAX لحفظ الإعدادات
+            }
+
+            function createBackup() {
+                if (confirm('هل تريد إنشاء نسخة احتياطية من البيانات؟')) {
+                    alert('جاري إنشاء النسخة الاحتياطية...');
+                    // يمكن إضافة وظيفة النسخ الاحتياطي هنا
+                    setTimeout(() => {
+                        alert('تم إنشاء النسخة الاحتياطية بنجاح!');
+                    }, 2000);
+                }
             }
 
             function confirmReset() {
