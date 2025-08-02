@@ -6,6 +6,7 @@ Complete Professional Accounting System - Python 3.11 Compatible
 """
 
 import os
+import json
 from datetime import datetime, date
 
 # إضافة دوال مساعدة لـ Jinja2
@@ -49,6 +50,11 @@ app = Flask(__name__)
 
 # الإعدادات
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'accounting-system-complete-2024')
+app.config['UPLOAD_FOLDER'] = 'static/uploads'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+
+# إنشاء مجلد الرفع إذا لم يكن موجوداً
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # إعداد قاعدة البيانات مع ضمان الحفظ الدائم
 if os.environ.get('DATABASE_URL'):
@@ -266,6 +272,259 @@ class Payment(db.Model):
     customer = db.relationship('Customer', backref='payments')
     supplier = db.relationship('Supplier', backref='payments')
 
+class SystemSettings(db.Model):
+    """إعدادات النظام العامة"""
+    id = db.Column(db.Integer, primary_key=True)
+    setting_key = db.Column(db.String(100), unique=True, nullable=False)
+    setting_value = db.Column(db.Text)
+    setting_type = db.Column(db.String(20), default='text')  # text, file, json, etc
+    description = db.Column(db.String(200))
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @staticmethod
+    def get_setting(key, default=None):
+        """الحصول على قيمة إعداد"""
+        setting = SystemSettings.query.filter_by(setting_key=key).first()
+        return setting.setting_value if setting else default
+
+    @staticmethod
+    def set_setting(key, value, setting_type='text', description=None):
+        """تعيين قيمة إعداد"""
+        setting = SystemSettings.query.filter_by(setting_key=key).first()
+        if setting:
+            setting.setting_value = value
+            setting.setting_type = setting_type
+            setting.updated_at = datetime.utcnow()
+        else:
+            setting = SystemSettings(
+                setting_key=key,
+                setting_value=value,
+                setting_type=setting_type,
+                description=description
+            )
+            db.session.add(setting)
+        db.session.commit()
+        return setting
+
+# ===== وظائف مساعدة للحفظ التلقائي =====
+
+def get_auto_save_script():
+    """إرجاع كود JavaScript للحفظ التلقائي"""
+    return '''
+    <script>
+    // نظام الحفظ التلقائي المتقدم
+    class AutoSaveSystem {
+        constructor() {
+            this.saveInterval = 30000; // حفظ كل 30 ثانية
+            this.formData = {};
+            this.isDirty = false;
+            this.isOnline = navigator.onLine;
+            this.init();
+        }
+
+        init() {
+            // مراقبة تغييرات النماذج
+            this.watchForms();
+
+            // مراقبة حالة الاتصال
+            window.addEventListener('online', () => {
+                this.isOnline = true;
+                this.syncPendingData();
+            });
+
+            window.addEventListener('offline', () => {
+                this.isOnline = false;
+            });
+
+            // حفظ عند إغلاق الصفحة
+            window.addEventListener('beforeunload', (e) => {
+                if (this.isDirty) {
+                    this.saveFormData();
+                    e.preventDefault();
+                    e.returnValue = 'لديك تغييرات غير محفوظة. هل تريد المغادرة؟';
+                }
+            });
+
+            // بدء الحفظ التلقائي
+            setInterval(() => {
+                if (this.isDirty && this.isOnline) {
+                    this.saveFormData();
+                }
+            }, this.saveInterval);
+
+            // استرجاع البيانات المحفوظة عند تحميل الصفحة
+            this.loadSavedData();
+        }
+
+        watchForms() {
+            const forms = document.querySelectorAll('form');
+            forms.forEach(form => {
+                const inputs = form.querySelectorAll('input, textarea, select');
+                inputs.forEach(input => {
+                    input.addEventListener('input', () => {
+                        this.isDirty = true;
+                        this.updateFormData(input);
+                    });
+
+                    input.addEventListener('change', () => {
+                        this.isDirty = true;
+                        this.updateFormData(input);
+                    });
+                });
+            });
+        }
+
+        updateFormData(input) {
+            const formId = input.form ? input.form.id || 'default' : 'default';
+            if (!this.formData[formId]) {
+                this.formData[formId] = {};
+            }
+
+            this.formData[formId][input.name || input.id] = {
+                value: input.value,
+                type: input.type,
+                timestamp: new Date().toISOString()
+            };
+
+            // حفظ في localStorage
+            localStorage.setItem('autoSave_' + formId, JSON.stringify(this.formData[formId]));
+        }
+
+        saveFormData() {
+            if (!this.isOnline) {
+                this.showMessage('غير متصل - سيتم الحفظ عند عودة الاتصال', 'warning');
+                return;
+            }
+
+            // إرسال البيانات للخادم
+            fetch('/api/auto-save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    formData: this.formData,
+                    timestamp: new Date().toISOString(),
+                    url: window.location.pathname
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    this.isDirty = false;
+                    this.showMessage('تم الحفظ تلقائياً ✓', 'success');
+                }
+            })
+            .catch(error => {
+                console.error('خطأ في الحفظ التلقائي:', error);
+                this.showMessage('خطأ في الحفظ التلقائي', 'error');
+            });
+        }
+
+        loadSavedData() {
+            const forms = document.querySelectorAll('form');
+            forms.forEach(form => {
+                const formId = form.id || 'default';
+                const savedData = localStorage.getItem('autoSave_' + formId);
+
+                if (savedData) {
+                    try {
+                        const data = JSON.parse(savedData);
+                        Object.keys(data).forEach(fieldName => {
+                            const field = form.querySelector(`[name="${fieldName}"], #${fieldName}`);
+                            if (field && data[fieldName].value) {
+                                field.value = data[fieldName].value;
+                                field.style.backgroundColor = '#fff3cd'; // تمييز الحقول المسترجعة
+                            }
+                        });
+
+                        if (Object.keys(data).length > 0) {
+                            this.showMessage('تم استرجاع البيانات المحفوظة', 'info');
+                        }
+                    } catch (e) {
+                        console.error('خطأ في استرجاع البيانات:', e);
+                    }
+                }
+            });
+        }
+
+        syncPendingData() {
+            // مزامنة البيانات المعلقة عند عودة الاتصال
+            if (this.isDirty) {
+                this.saveFormData();
+            }
+        }
+
+        showMessage(message, type = 'info') {
+            // إنشاء رسالة تنبيه
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type === 'success' ? 'success' : type === 'error' ? 'danger' : type === 'warning' ? 'warning' : 'info'} auto-save-alert`;
+            alertDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 9999;
+                min-width: 250px;
+                opacity: 0.9;
+                transition: all 0.3s ease;
+            `;
+            alertDiv.innerHTML = `
+                <small><i class="fas fa-save me-1"></i>${message}</small>
+                <button type="button" class="btn-close btn-close-sm" onclick="this.parentElement.remove()"></button>
+            `;
+
+            document.body.appendChild(alertDiv);
+
+            // إزالة الرسالة بعد 3 ثوان
+            setTimeout(() => {
+                if (alertDiv.parentElement) {
+                    alertDiv.remove();
+                }
+            }, 3000);
+        }
+
+        clearSavedData(formId = null) {
+            if (formId) {
+                localStorage.removeItem('autoSave_' + formId);
+                delete this.formData[formId];
+            } else {
+                // مسح جميع البيانات المحفوظة
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith('autoSave_')) {
+                        localStorage.removeItem(key);
+                    }
+                });
+                this.formData = {};
+            }
+            this.isDirty = false;
+        }
+    }
+
+    // تشغيل نظام الحفظ التلقائي عند تحميل الصفحة
+    document.addEventListener('DOMContentLoaded', function() {
+        window.autoSave = new AutoSaveSystem();
+
+        // إضافة مؤشر حالة الحفظ
+        const statusIndicator = document.createElement('div');
+        statusIndicator.id = 'save-status';
+        statusIndicator.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: #28a745;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            z-index: 1000;
+            display: none;
+        `;
+        statusIndicator.innerHTML = '<i class="fas fa-check-circle me-1"></i>محفوظ';
+        document.body.appendChild(statusIndicator);
+    });
+    </script>
+    '''
+
 # ===== الصفحات الأساسية =====
 
 @app.route('/')
@@ -447,8 +706,7 @@ def login():
 
                         <div class="text-center mt-4">
                             <small class="text-muted">
-                                المستخدم الافتراضي: <strong>admin</strong><br>
-                                كلمة المرور: <strong>admin123</strong>
+                                <i class="fas fa-shield-alt me-1"></i>نظام محاسبة آمن ومحمي
                             </small>
                         </div>
                     </div>
@@ -457,6 +715,7 @@ def login():
         </div>
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        {{ get_auto_save_script()|safe }}
     </body>
     </html>
     ''')
@@ -538,8 +797,9 @@ def dashboard():
     <body>
         <nav class="navbar navbar-expand-lg navbar-dark">
             <div class="container">
-                <a class="navbar-brand" href="{{ url_for('dashboard') }}">
-                    <i class="fas fa-calculator me-2"></i>نظام المحاسبة الاحترافي
+                <a class="navbar-brand d-flex align-items-center" href="{{ url_for('dashboard') }}">
+                    <img src="{{ get_company_logo() }}" alt="شعار الشركة" style="height: 40px; margin-left: 10px;" class="company-logo">
+                    <span>نظام المحاسبة الاحترافي</span>
                 </a>
                 <div class="navbar-nav ms-auto">
                     <span class="navbar-text me-3">
@@ -777,6 +1037,7 @@ def dashboard():
         </div>
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        {{ get_auto_save_script()|safe }}
     </body>
     </html>
     ''',
@@ -813,8 +1074,9 @@ def customers():
     <body>
         <nav class="navbar navbar-expand-lg navbar-dark">
             <div class="container">
-                <a class="navbar-brand" href="{{ url_for('dashboard') }}">
-                    <i class="fas fa-calculator me-2"></i>نظام المحاسبة
+                <a class="navbar-brand d-flex align-items-center" href="{{ url_for('dashboard') }}">
+                    <img src="{{ get_company_logo() }}" alt="شعار الشركة" style="height: 40px; margin-left: 10px;" class="company-logo">
+                    <span>نظام المحاسبة</span>
                 </a>
                 <div class="navbar-nav ms-auto">
                     <a class="nav-link" href="javascript:history.back()">
@@ -1044,6 +1306,7 @@ def customers():
                 });
             });
         </script>
+        {{ get_auto_save_script()|safe }}
     </body>
     </html>
     ''', customers=customers, total_customers=total_customers)
@@ -8533,6 +8796,65 @@ def mark_as_overdue(invoice_type, invoice_id):
     expense_by_category=expense_by_category, top_customers=top_customers, top_suppliers=top_suppliers,
     current_year=current_year)
 
+@app.route('/api/auto-save', methods=['POST'])
+@login_required
+def api_auto_save():
+    """API للحفظ التلقائي"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'لا توجد بيانات'})
+
+        # حفظ البيانات في إعدادات النظام
+        user_id = current_user.id
+        save_key = f"autosave_{user_id}_{data.get('url', 'default')}"
+
+        SystemSettings.set_setting(
+            save_key,
+            json.dumps(data),
+            'json',
+            f'Auto-save data for user {user_id}'
+        )
+
+        return jsonify({
+            'success': True,
+            'message': 'تم الحفظ بنجاح',
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'خطأ في الحفظ: {str(e)}'
+        })
+
+@app.route('/api/load-saved', methods=['GET'])
+@login_required
+def api_load_saved():
+    """API لتحميل البيانات المحفوظة"""
+    try:
+        user_id = current_user.id
+        url = request.args.get('url', 'default')
+        save_key = f"autosave_{user_id}_{url}"
+
+        saved_data = SystemSettings.get_setting(save_key)
+        if saved_data:
+            return jsonify({
+                'success': True,
+                'data': json.loads(saved_data)
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'لا توجد بيانات محفوظة'
+            })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'خطأ في التحميل: {str(e)}'
+        })
+
 @app.route('/api/status')
 def api_status():
     return render_template_string('''
@@ -9409,6 +9731,58 @@ def change_password():
 
 # ===== نظام الإعدادات المحسن =====
 
+@app.route('/upload_logo', methods=['POST'])
+@login_required
+def upload_logo():
+    """رفع شعار جديد"""
+    try:
+        if 'logo' not in request.files:
+            return jsonify({'success': False, 'message': 'لم يتم اختيار ملف'})
+
+        file = request.files['logo']
+        if file.filename == '':
+            return jsonify({'success': False, 'message': 'لم يتم اختيار ملف'})
+
+        # التحقق من نوع الملف
+        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
+        if not ('.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
+            return jsonify({'success': False, 'message': 'نوع الملف غير مدعوم. يرجى استخدام PNG, JPG, JPEG, GIF, أو SVG'})
+
+        # إنشاء اسم ملف آمن
+        import uuid
+        file_extension = file.filename.rsplit('.', 1)[1].lower()
+        filename = f"logo_{uuid.uuid4().hex[:8]}.{file_extension}"
+
+        # حفظ الملف
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(file_path)
+
+        # حفظ مسار الشعار في الإعدادات
+        logo_url = f"/static/uploads/{filename}"
+        SystemSettings.set_setting('company_logo', logo_url, 'file', 'شعار الشركة')
+
+        return jsonify({
+            'success': True,
+            'message': 'تم رفع الشعار بنجاح',
+            'logo_url': logo_url
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'خطأ في رفع الشعار: {str(e)}'})
+
+def get_company_logo():
+    """الحصول على شعار الشركة"""
+    return SystemSettings.get_setting('company_logo', '/static/default_logo.png')
+
+# إضافة context processors
+@app.context_processor
+def inject_global_functions():
+    """إضافة وظائف عامة لجميع templates"""
+    return {
+        'get_auto_save_script': get_auto_save_script,
+        'get_company_logo': get_company_logo
+    }
+
 @app.route('/settings')
 @login_required
 def settings():
@@ -9437,6 +9811,32 @@ def settings():
                 border: none;
                 overflow: hidden;
                 margin-bottom: 30px;
+            }
+            .logo-preview {
+                max-width: 200px;
+                max-height: 100px;
+                border: 2px dashed #ddd;
+                border-radius: 10px;
+                padding: 10px;
+                display: block;
+                margin: 10px auto;
+            }
+            .upload-area {
+                border: 2px dashed #007bff;
+                border-radius: 10px;
+                padding: 30px;
+                text-align: center;
+                background: #f8f9ff;
+                transition: all 0.3s ease;
+                cursor: pointer;
+            }
+            .upload-area:hover {
+                background: #e3f2fd;
+                border-color: #0056b3;
+            }
+            .upload-area.dragover {
+                background: #e8f5e8;
+                border-color: #28a745;
             }
             .settings-card:hover {
                 transform: translateY(-10px);
@@ -9569,6 +9969,52 @@ def settings():
                                     </button>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- إدارة الشعار -->
+                <div class="col-md-6">
+                    <div class="settings-card">
+                        <div class="card-header bg-success text-white p-4">
+                            <h5 class="mb-0 fw-bold"><i class="fas fa-image me-2"></i>إدارة شعار الشركة</h5>
+                        </div>
+                        <div class="card-body p-4">
+                            <!-- عرض الشعار الحالي -->
+                            <div class="text-center mb-4">
+                                <h6 class="fw-bold mb-3">الشعار الحالي:</h6>
+                                <img id="current-logo" src="{{ get_company_logo() }}" alt="شعار الشركة" class="logo-preview">
+                            </div>
+
+                            <!-- رفع شعار جديد -->
+                            <div class="upload-area" onclick="document.getElementById('logo-input').click()">
+                                <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                                <h6 class="fw-bold">اضغط لرفع شعار جديد</h6>
+                                <p class="text-muted mb-0">أو اسحب الملف هنا</p>
+                                <small class="text-muted">PNG, JPG, JPEG, GIF, SVG (حد أقصى 16MB)</small>
+                            </div>
+
+                            <input type="file" id="logo-input" accept="image/*" style="display: none;">
+
+                            <div class="mt-3">
+                                <button type="button" class="btn btn-success w-100" onclick="uploadLogo()">
+                                    <i class="fas fa-upload me-2"></i>رفع الشعار
+                                </button>
+                            </div>
+
+                            <!-- معاينة الشعار الجديد -->
+                            <div id="logo-preview-container" style="display: none;" class="mt-3">
+                                <h6 class="fw-bold">معاينة الشعار الجديد:</h6>
+                                <img id="logo-preview" class="logo-preview" alt="معاينة الشعار">
+                                <div class="mt-2">
+                                    <button type="button" class="btn btn-primary btn-sm me-2" onclick="confirmLogoUpload()">
+                                        <i class="fas fa-check me-1"></i>تأكيد
+                                    </button>
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="cancelLogoUpload()">
+                                        <i class="fas fa-times me-1"></i>إلغاء
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -9887,6 +10333,111 @@ def settings():
                 }
             }
 
+            // وظائف إدارة الشعار
+            let selectedLogoFile = null;
+
+            // مراقبة تغيير ملف الشعار
+            document.getElementById('logo-input').addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    // التحقق من نوع الملف
+                    const allowedTypes = ['image/png', 'image/jpg', 'image/jpeg', 'image/gif', 'image/svg+xml'];
+                    if (!allowedTypes.includes(file.type)) {
+                        alert('نوع الملف غير مدعوم. يرجى استخدام PNG, JPG, JPEG, GIF, أو SVG');
+                        return;
+                    }
+
+                    // التحقق من حجم الملف (16MB)
+                    if (file.size > 16 * 1024 * 1024) {
+                        alert('حجم الملف كبير جداً. الحد الأقصى 16MB');
+                        return;
+                    }
+
+                    selectedLogoFile = file;
+
+                    // عرض معاينة الشعار
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        document.getElementById('logo-preview').src = e.target.result;
+                        document.getElementById('logo-preview-container').style.display = 'block';
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            // رفع الشعار
+            function uploadLogo() {
+                if (!selectedLogoFile) {
+                    alert('يرجى اختيار ملف الشعار أولاً');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('logo', selectedLogoFile);
+
+                // إظهار مؤشر التحميل
+                const uploadBtn = document.querySelector('button[onclick="uploadLogo()"]');
+                const originalText = uploadBtn.innerHTML;
+                uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>جاري الرفع...';
+                uploadBtn.disabled = true;
+
+                fetch('/upload_logo', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // تحديث الشعار في الصفحة
+                        document.getElementById('current-logo').src = data.logo_url + '?t=' + new Date().getTime();
+
+                        // إخفاء معاينة الشعار الجديد
+                        document.getElementById('logo-preview-container').style.display = 'none';
+                        selectedLogoFile = null;
+                        document.getElementById('logo-input').value = '';
+
+                        alert('تم رفع الشعار بنجاح!');
+
+                        // تحديث الشعار في جميع أنحاء الموقع
+                        updateLogoEverywhere(data.logo_url);
+                    } else {
+                        alert('خطأ في رفع الشعار: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('خطأ:', error);
+                    alert('حدث خطأ أثناء رفع الشعار');
+                })
+                .finally(() => {
+                    // إعادة تعيين الزر
+                    uploadBtn.innerHTML = originalText;
+                    uploadBtn.disabled = false;
+                });
+            }
+
+            function confirmLogoUpload() {
+                uploadLogo();
+            }
+
+            function cancelLogoUpload() {
+                document.getElementById('logo-preview-container').style.display = 'none';
+                selectedLogoFile = null;
+                document.getElementById('logo-input').value = '';
+            }
+
+            function updateLogoEverywhere(logoUrl) {
+                // تحديث الشعار في جميع العناصر التي تحتوي على شعار الشركة
+                const logoElements = document.querySelectorAll('img[alt*="شعار"], .company-logo, .navbar-brand img');
+                logoElements.forEach(element => {
+                    if (element.tagName === 'IMG') {
+                        element.src = logoUrl + '?t=' + new Date().getTime();
+                    }
+                });
+
+                // حفظ في localStorage للاستخدام في الصفحات الأخرى
+                localStorage.setItem('companyLogo', logoUrl);
+            }
+
             // تحسين تجربة المستخدم
             document.addEventListener('DOMContentLoaded', function() {
                 // التحقق من تطابق كلمة المرور
@@ -9930,7 +10481,7 @@ def settings():
         </script>
     </body>
     </html>
-    ''')
+    ''', get_company_logo=get_company_logo)
 
 # ===== تهيئة قاعدة البيانات =====
 
