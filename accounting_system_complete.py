@@ -1056,6 +1056,65 @@ def dashboard():
                 from { opacity: 0; transform: translateX(50px); }
                 to { opacity: 1; transform: translateX(0); }
             }
+
+            /* تحسينات مبدل اللغة */
+            .language-dropdown .dropdown-toggle {
+                background: rgba(255,255,255,0.1);
+                border: 2px solid rgba(255,255,255,0.3);
+                color: white;
+                transition: all 0.3s ease;
+                border-radius: 25px;
+                padding: 8px 16px;
+                font-weight: 500;
+            }
+
+            .language-dropdown .dropdown-toggle:hover,
+            .language-dropdown .dropdown-toggle:focus {
+                background: rgba(255,255,255,0.2);
+                border-color: rgba(255,255,255,0.8);
+                box-shadow: 0 0 15px rgba(255,255,255,0.3);
+                transform: translateY(-2px);
+            }
+
+            .language-dropdown .dropdown-menu {
+                background: rgba(255,255,255,0.95);
+                backdrop-filter: blur(10px);
+                border: none;
+                box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+                border-radius: 15px;
+                padding: 10px 0;
+                min-width: 180px;
+                margin-top: 10px;
+            }
+
+            .language-dropdown .dropdown-item {
+                padding: 12px 20px;
+                transition: all 0.3s ease;
+                border-radius: 10px;
+                margin: 2px 10px;
+                font-weight: 500;
+            }
+
+            .language-dropdown .dropdown-item:hover {
+                background: var(--primary-gradient);
+                color: white;
+                transform: translateX(5px);
+            }
+
+            .language-dropdown .dropdown-item.active {
+                background: var(--primary-gradient);
+                color: white;
+                font-weight: 600;
+            }
+
+            .language-dropdown .dropdown-item i.fa-flag {
+                color: #ffd700;
+            }
+
+            .language-dropdown .dropdown-divider {
+                margin: 8px 15px;
+                border-color: rgba(0,0,0,0.1);
+            }
         </style>
     </head>
     <body>
@@ -1066,21 +1125,24 @@ def dashboard():
                     <span>{% if get_locale() == 'ar' %}نظام المحاسبة الاحترافي{% else %}Professional Accounting System{% endif %}</span>
                 </a>
                 <div class="navbar-nav ms-auto">
-                    <!-- مبدل اللغة -->
-                    <div class="dropdown me-3">
-                        <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <!-- مبدل اللغة المحسن -->
+                    <div class="dropdown language-dropdown me-3">
+                        <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button" id="languageDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="fas fa-globe me-1"></i>
-                            {% if get_locale() == 'ar' %}العربية{% else %}English{% endif %}
+                            <span id="currentLanguage">{% if get_locale() == 'ar' %}العربية{% else %}English{% endif %}</span>
                         </button>
-                        <ul class="dropdown-menu">
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="languageDropdown">
                             <li>
-                                <a class="dropdown-item {% if get_locale() == 'ar' %}active{% endif %}" href="{{ url_for('change_language', language='ar') }}">
-                                    <i class="fas fa-check me-2 {% if get_locale() != 'ar' %}invisible{% endif %}"></i>العربية
+                                <a class="dropdown-item {% if get_locale() == 'ar' %}active{% endif %}" href="{{ url_for('change_language', language='ar') }}" onclick="changeLanguage('ar')">
+                                    <i class="fas fa-check me-2 {% if get_locale() != 'ar' %}invisible{% endif %}"></i>
+                                    <i class="fas fa-flag me-2"></i>العربية
                                 </a>
                             </li>
+                            <li><hr class="dropdown-divider"></li>
                             <li>
-                                <a class="dropdown-item {% if get_locale() == 'en' %}active{% endif %}" href="{{ url_for('change_language', language='en') }}">
-                                    <i class="fas fa-check me-2 {% if get_locale() != 'en' %}invisible{% endif %}"></i>English
+                                <a class="dropdown-item {% if get_locale() == 'en' %}active{% endif %}" href="{{ url_for('change_language', language='en') }}" onclick="changeLanguage('en')">
+                                    <i class="fas fa-check me-2 {% if get_locale() != 'en' %}invisible{% endif %}"></i>
+                                    <i class="fas fa-flag me-2"></i>English
                                 </a>
                             </li>
                         </ul>
@@ -1620,6 +1682,67 @@ def dashboard():
             }
             });
 
+            // وظيفة تغيير اللغة
+            function changeLanguage(lang) {
+                // تحديث النص في الزر
+                const currentLangSpan = document.getElementById('currentLanguage');
+                if (currentLangSpan) {
+                    currentLangSpan.textContent = lang === 'ar' ? 'العربية' : 'English';
+                }
+
+                // إظهار رسالة تحميل
+                const loadingToast = document.createElement('div');
+                loadingToast.className = 'toast-container position-fixed top-0 end-0 p-3';
+                loadingToast.innerHTML = `
+                    <div class="toast show" role="alert">
+                        <div class="toast-header">
+                            <i class="fas fa-globe text-primary me-2"></i>
+                            <strong class="me-auto">${lang === 'ar' ? 'تغيير اللغة' : 'Language Change'}</strong>
+                        </div>
+                        <div class="toast-body">
+                            ${lang === 'ar' ? 'جاري تحميل اللغة العربية...' : 'Loading English language...'}
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(loadingToast);
+
+                // إزالة الرسالة بعد ثانيتين
+                setTimeout(() => {
+                    loadingToast.remove();
+                }, 2000);
+
+                return true; // السماح بالانتقال
+            }
+
+            // تحسين dropdown للغات
+            document.addEventListener('DOMContentLoaded', function() {
+                const languageDropdown = document.getElementById('languageDropdown');
+                if (languageDropdown) {
+                    // إضافة تأثير hover
+                    languageDropdown.addEventListener('mouseenter', function() {
+                        this.style.transform = 'scale(1.05)';
+                    });
+
+                    languageDropdown.addEventListener('mouseleave', function() {
+                        this.style.transform = 'scale(1)';
+                    });
+                }
+
+                // تحسين عناصر القائمة
+                const dropdownItems = document.querySelectorAll('.dropdown-item');
+                dropdownItems.forEach(item => {
+                    item.addEventListener('mouseenter', function() {
+                        this.style.backgroundColor = '#f8f9fa';
+                        this.style.transform = 'translateX(5px)';
+                    });
+
+                    item.addEventListener('mouseleave', function() {
+                        this.style.backgroundColor = '';
+                        this.style.transform = 'translateX(0)';
+                    });
+                });
+            });
+
             // تأثير الموجة للأزرار
             const style = document.createElement('style');
             style.textContent = `
@@ -1637,6 +1760,40 @@ def dashboard():
                         transform: scale(4);
                         opacity: 0;
                     }
+                }
+
+                /* تحسينات مبدل اللغة */
+                .dropdown-toggle {
+                    transition: all 0.3s ease;
+                    border: 2px solid rgba(255,255,255,0.3) !important;
+                }
+
+                .dropdown-toggle:hover {
+                    border-color: rgba(255,255,255,0.8) !important;
+                    box-shadow: 0 0 10px rgba(255,255,255,0.3);
+                }
+
+                .dropdown-menu {
+                    border: none;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+                    border-radius: 10px;
+                    overflow: hidden;
+                }
+
+                .dropdown-item {
+                    transition: all 0.3s ease;
+                    padding: 12px 20px;
+                }
+
+                .dropdown-item:hover {
+                    background: linear-gradient(45deg, #667eea, #764ba2);
+                    color: white;
+                    transform: translateX(5px);
+                }
+
+                .dropdown-item.active {
+                    background: linear-gradient(45deg, #667eea, #764ba2);
+                    color: white;
                 }
             `;
             document.head.appendChild(style);
