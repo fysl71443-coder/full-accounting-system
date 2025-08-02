@@ -937,7 +937,7 @@ def dashboard():
             .navbar {
                 background: var(--primary-gradient) !important;
                 box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-                backdrop-filter: blur(10px);
+                /* إزالة backdrop-filter لمنع تأثير blur على المبدلات */
             }
 
             .navbar-brand {
@@ -1269,14 +1269,72 @@ def dashboard():
                 pointer-events: auto !important;
             }
 
-            /* إزالة أي تأثيرات ضبابية من العناصر الأساسية */
+            /* إزالة أي تأثيرات ضبابية من العناصر الأساسية - قوي جداً */
             .navbar-nav .dropdown,
             .navbar-nav .dropdown-menu,
-            .navbar-nav .dropdown-item {
+            .navbar-nav .dropdown-item,
+            .navbar-nav .dropdown-toggle,
+            .navbar-nav .btn,
+            .navbar-nav .language-btn,
+            .navbar-nav .branch-btn {
                 opacity: 1 !important;
                 filter: none !important;
                 backdrop-filter: none !important;
                 pointer-events: auto !important;
+                -webkit-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+                transform: none !important;
+            }
+
+            /* منع أي blur من العناصر الأب */
+            .navbar-nav,
+            .navbar-collapse,
+            .navbar {
+                filter: none !important;
+                backdrop-filter: none !important;
+                -webkit-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+            }
+
+            /* تأكيد إضافي لوضوح المبدلات */
+            #languageDropdown,
+            #branchDropdown,
+            .language-btn,
+            .branch-btn {
+                filter: none !important;
+                backdrop-filter: none !important;
+                -webkit-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+                opacity: 1 !important;
+                visibility: visible !important;
+                pointer-events: auto !important;
+                transform: none !important;
+            }
+
+            /* CSS إضافي لمنع أي blur من أي مصدر */
+            * {
+                -webkit-backdrop-filter: none !important;
+                backdrop-filter: none !important;
+            }
+
+            /* استثناء للعناصر التي تحتاج blur فعلاً */
+            .card:not(.navbar-nav *),
+            .modal:not(.navbar-nav *),
+            .alert:not(.navbar-nav *) {
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+            }
+
+            /* تأكيد نهائي للمبدلات */
+            .dropdown-toggle,
+            .dropdown-menu,
+            .dropdown-item {
+                filter: none !important;
+                backdrop-filter: none !important;
+                -webkit-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+                opacity: 1 !important;
+                visibility: visible !important;
             }
         </style>
     </head>
