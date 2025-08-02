@@ -127,36 +127,48 @@ if BABEL_AVAILABLE:
 else:
     babel = DummyBabel()
 
-# إعداد قاعدة البيانات مع ضمان الحفظ الدائم
-if os.environ.get('DATABASE_URL'):
-    # في بيئة الإنتاج (Render)
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
-else:
-    # في بيئة التطوير - إنشاء مجلد instance إذا لم يكن موجوداً
-    instance_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance')
-    if not os.path.exists(instance_path):
-        os.makedirs(instance_path)
-
-    db_path = os.path.join(instance_path, 'accounting_complete.db')
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
-
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_pre_ping': True,
-    'pool_recycle': 300,
-}
-
-# إعداد قاعدة البيانات مع دعم PostgreSQL
+# إعداد قاعدة البيانات مع دعم PostgreSQL والتعامل مع بيئات مختلفة
 database_url = os.environ.get('DATABASE_URL')
+
 if database_url:
+    # في بيئة الإنتاج (Render أو Heroku)
     # تحويل postgres:// إلى postgresql:// للتوافق مع SQLAlchemy الحديث
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-    print(f"🐘 استخدام PostgreSQL: {database_url.split('@')[1] if '@' in database_url else 'مخفي'}")
+    print(f"🐘 استخدام PostgreSQL في الإنتاج: {database_url.split('@')[1] if '@' in database_url else 'مخفي'}")
+
+    # إعدادات خاصة بـ PostgreSQL
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+        'pool_timeout': 20,
+        'max_overflow': 0
+    }
 else:
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///instance/accounting_complete.db'
-    print("📁 استخدام SQLite المحلي")
+    # في بيئة التطوير المحلي
+    try:
+        # محاولة إنشاء مجلد instance إذا لم يكن موجوداً
+        instance_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance')
+        if not os.path.exists(instance_path):
+            os.makedirs(instance_path, exist_ok=True)
+
+        db_path = os.path.join(instance_path, 'accounting_complete.db')
+        app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+        print(f"📁 استخدام SQLite المحلي: {db_path}")
+
+        # إعدادات خاصة بـ SQLite
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            'pool_pre_ping': True,
+            'pool_recycle': 300,
+        }
+    except Exception as e:
+        # في حالة فشل إنشاء المجلد، استخدام ذاكرة مؤقتة
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+        print(f"⚠️ استخدام قاعدة بيانات مؤقتة في الذاكرة: {e}")
+
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {}
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -12681,9 +12693,23 @@ def settings():
 # ===== تهيئة قاعدة البيانات =====
 
 def init_db():
-    """تهيئة قاعدة البيانات وإنشاء البيانات الأساسية"""
+    """تهيئة قاعدة البيانات وإنشاء البيانات الأساسية مع معالجة الأخطاء"""
     with app.app_context():
         try:
+            # التحقق من الاتصال بقاعدة البيانات أولاً
+            try:
+                db.engine.connect()
+                print("✅ تم الاتصال بقاعدة البيانات بنجاح")
+            except Exception as conn_error:
+                print(f"❌ فشل الاتصال بقاعدة البيانات: {conn_error}")
+
+                # في حالة فشل الاتصال، استخدام قاعدة بيانات مؤقتة
+                app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+                print("🔄 تم التبديل لقاعدة بيانات مؤقتة في الذاكرة")
+
+                # إعادة تهيئة قاعدة البيانات
+                db.init_app(app)
+
             # إنشاء الجداول
             db.create_all()
 
@@ -12766,6 +12792,30 @@ def init_db():
         except Exception as e:
             print(f"❌ خطأ في تهيئة قاعدة البيانات: {e}")
             db.session.rollback()
+
+            # محاولة أخيرة باستخدام قاعدة بيانات مؤقتة
+            try:
+                print("🔄 محاولة استخدام قاعدة بيانات مؤقتة...")
+                app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+                db.init_app(app)
+                db.create_all()
+
+                # إنشاء مستخدم افتراضي فقط
+                if not User.query.filter_by(username='admin').first():
+                    admin = User(
+                        username='admin',
+                        full_name='مدير النظام',
+                        role='admin'
+                    )
+                    admin.set_password('admin123')
+                    db.session.add(admin)
+                    db.session.commit()
+
+                print("⚠️ تم استخدام قاعدة بيانات مؤقتة - البيانات ستفقد عند إعادة التشغيل")
+
+            except Exception as e2:
+                print(f"💥 فشل كامل في تهيئة قاعدة البيانات: {e2}")
+                print("🆘 النظام قد لا يعمل بشكل صحيح")
 
 # وظيفة فحص حالة البيانات
 @app.route('/check_data_status')

@@ -4,16 +4,20 @@ services:
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: python accounting_system_complete.py
+    startCommand: gunicorn wsgi:application --bind 0.0.0.0:$PORT --worker-class eventlet -w 1
     envVars:
       - key: SECRET_KEY
         generateValue: true
-      - key: DATABASE_URL
-        value: postgresql://USER:PASSWORD@HOST/DBNAME
       - key: PYTHON_VERSION
         value: 3.10.12
       - key: FLASK_ENV
         value: production
     healthCheckPath: /
     autoDeploy: true
+
+databases:
+  - name: accounting-postgres
+    databaseName: accounting_system
+    user: accounting_user
+    plan: free
 
