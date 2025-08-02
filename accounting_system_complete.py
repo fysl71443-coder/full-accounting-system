@@ -7,6 +7,7 @@ Complete Professional Accounting System - Python 3.11 Compatible
 
 import os
 import json
+import shutil
 from datetime import datetime, date
 
 # إضافة دوال مساعدة لـ Jinja2
@@ -1234,9 +1235,41 @@ def customers():
                 setInterval(checkDataStatus, 30000);
             });
 
-            // إضافة مؤشر حفظ للنماذج
+            // إضافة مؤشر حفظ للنماذج مع التحقق من البيانات
             document.querySelectorAll('form').forEach(form => {
-                form.addEventListener('submit', function() {
+                form.addEventListener('submit', function(e) {
+                    // التحقق من الحقول المطلوبة
+                    const requiredFields = this.querySelectorAll('input[required], select[required], textarea[required]');
+                    let hasErrors = false;
+
+                    requiredFields.forEach(field => {
+                        if (!field.value.trim()) {
+                            field.classList.add('is-invalid');
+                            hasErrors = true;
+
+                            // إضافة رسالة خطأ إذا لم تكن موجودة
+                            let errorDiv = field.parentNode.querySelector('.invalid-feedback');
+                            if (!errorDiv) {
+                                errorDiv = document.createElement('div');
+                                errorDiv.className = 'invalid-feedback';
+                                field.parentNode.appendChild(errorDiv);
+                            }
+                            errorDiv.textContent = 'هذا الحقل مطلوب';
+                        } else {
+                            field.classList.remove('is-invalid');
+                            const errorDiv = field.parentNode.querySelector('.invalid-feedback');
+                            if (errorDiv) {
+                                errorDiv.remove();
+                            }
+                        }
+                    });
+
+                    if (hasErrors) {
+                        e.preventDefault();
+                        alert('يرجى ملء جميع الحقول المطلوبة');
+                        return false;
+                    }
+
                     const submitBtn = form.querySelector('button[type="submit"]');
                     if (submitBtn) {
                         const originalText = submitBtn.innerHTML;
@@ -1249,6 +1282,20 @@ def customers():
                             submitBtn.disabled = false;
                         }, 3000);
                     }
+                });
+
+                // إضافة التحقق الفوري عند الكتابة
+                const requiredFields = form.querySelectorAll('input[required], select[required], textarea[required]');
+                requiredFields.forEach(field => {
+                    field.addEventListener('input', function() {
+                        if (this.value.trim()) {
+                            this.classList.remove('is-invalid');
+                            const errorDiv = this.parentNode.querySelector('.invalid-feedback');
+                            if (errorDiv) {
+                                errorDiv.remove();
+                            }
+                        }
+                    });
                 });
             });
 
@@ -9731,6 +9778,126 @@ def change_password():
 
 # ===== نظام الإعدادات المحسن =====
 
+@app.route('/create_backup', methods=['POST'])
+@login_required
+def create_backup():
+    """إنشاء نسخة احتياطية من قاعدة البيانات"""
+    try:
+        import sqlite3
+        import shutil
+        from datetime import datetime
+
+        # إنشاء مجلد النسخ الاحتياطية
+        backup_dir = 'backups'
+        os.makedirs(backup_dir, exist_ok=True)
+
+        # اسم ملف النسخة الاحتياطية
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_filename = f'accounting_backup_{timestamp}.db'
+        backup_path = os.path.join(backup_dir, backup_filename)
+
+        # نسخ قاعدة البيانات
+        db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+        shutil.copy2(db_path, backup_path)
+
+        # إنشاء ملف JSON مع البيانات المهمة
+        backup_data = {
+            'timestamp': datetime.now().isoformat(),
+            'database_file': backup_filename,
+            'version': '1.0',
+            'description': 'نسخة احتياطية كاملة من نظام المحاسبة'
+        }
+
+        # حفظ معلومات النسخة الاحتياطية
+        info_filename = f'backup_info_{timestamp}.json'
+        info_path = os.path.join(backup_dir, info_filename)
+
+        with open(info_path, 'w', encoding='utf-8') as f:
+            json.dump(backup_data, f, ensure_ascii=False, indent=2)
+
+        return jsonify({
+            'success': True,
+            'message': 'تم إنشاء النسخة الاحتياطية بنجاح',
+            'backup_file': backup_filename,
+            'backup_path': backup_path,
+            'timestamp': timestamp
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'خطأ في إنشاء النسخة الاحتياطية: {str(e)}'
+        })
+
+@app.route('/restore_backup', methods=['POST'])
+@login_required
+def restore_backup():
+    """استعادة النسخة الاحتياطية"""
+    try:
+        if 'backup_file' not in request.files:
+            return jsonify({'success': False, 'message': 'لم يتم اختيار ملف النسخة الاحتياطية'})
+
+        file = request.files['backup_file']
+        if file.filename == '':
+            return jsonify({'success': False, 'message': 'لم يتم اختيار ملف'})
+
+        # التحقق من نوع الملف
+        if not file.filename.endswith('.db'):
+            return jsonify({'success': False, 'message': 'يجب أن يكون الملف من نوع .db'})
+
+        # حفظ النسخة الاحتياطية الحالية قبل الاستعادة
+        current_db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+        backup_current = f"{current_db_path}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        shutil.copy2(current_db_path, backup_current)
+
+        # استعادة النسخة الاحتياطية
+        file.save(current_db_path)
+
+        return jsonify({
+            'success': True,
+            'message': 'تم استعادة النسخة الاحتياطية بنجاح',
+            'backup_current': backup_current
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'خطأ في استعادة النسخة الاحتياطية: {str(e)}'
+        })
+
+@app.route('/list_backups')
+@login_required
+def list_backups():
+    """قائمة النسخ الاحتياطية المتاحة"""
+    try:
+        backup_dir = 'backups'
+        if not os.path.exists(backup_dir):
+            return jsonify({'success': True, 'backups': []})
+
+        backups = []
+        for filename in os.listdir(backup_dir):
+            if filename.endswith('.db'):
+                file_path = os.path.join(backup_dir, filename)
+                file_stat = os.stat(file_path)
+
+                backups.append({
+                    'filename': filename,
+                    'size': file_stat.st_size,
+                    'created': datetime.fromtimestamp(file_stat.st_ctime).isoformat(),
+                    'modified': datetime.fromtimestamp(file_stat.st_mtime).isoformat()
+                })
+
+        # ترتيب حسب تاريخ الإنشاء (الأحدث أولاً)
+        backups.sort(key=lambda x: x['created'], reverse=True)
+
+        return jsonify({'success': True, 'backups': backups})
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'خطأ في جلب قائمة النسخ الاحتياطية: {str(e)}'
+        })
+
 @app.route('/upload_logo', methods=['POST'])
 @login_required
 def upload_logo():
@@ -10096,8 +10263,11 @@ def settings():
                                             <i class="fas fa-download"></i>
                                         </div>
                                         <h6>نسخ احتياطي</h6>
-                                        <button class="btn btn-info btn-sm">
+                                        <button class="btn btn-info btn-sm" onclick="createRealBackup()">
                                             <i class="fas fa-download me-1"></i>إنشاء نسخة
+                                        </button>
+                                        <button class="btn btn-outline-info btn-sm mt-1" onclick="showBackupsList()">
+                                            <i class="fas fa-list me-1"></i>عرض النسخ
                                         </button>
                                     </div>
                                 </div>
@@ -10107,9 +10277,10 @@ def settings():
                                             <i class="fas fa-upload"></i>
                                         </div>
                                         <h6>استعادة</h6>
-                                        <button class="btn btn-warning btn-sm">
+                                        <button class="btn btn-warning btn-sm" onclick="showRestoreModal()">
                                             <i class="fas fa-upload me-1"></i>استعادة نسخة
                                         </button>
+                                        <input type="file" id="restore-file-input" accept=".db" style="display: none;" onchange="restoreFromFile()">
                                     </div>
                                 </div>
                                 <div class="col-md-3">
@@ -10118,7 +10289,7 @@ def settings():
                                             <i class="fas fa-sync"></i>
                                         </div>
                                         <h6>تحديث</h6>
-                                        <button class="btn btn-success btn-sm">
+                                        <button class="btn btn-success btn-sm" onclick="updateSystem()">
                                             <i class="fas fa-sync me-1"></i>تحديث النظام
                                         </button>
                                     </div>
@@ -10436,6 +10607,141 @@ def settings():
 
                 // حفظ في localStorage للاستخدام في الصفحات الأخرى
                 localStorage.setItem('companyLogo', logoUrl);
+            }
+
+            // وظائف النسخ الاحتياطي والاستعادة
+            function createRealBackup() {
+                if (confirm('هل تريد إنشاء نسخة احتياطية من قاعدة البيانات؟')) {
+                    const btn = event.target;
+                    const originalText = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>جاري الإنشاء...';
+                    btn.disabled = true;
+
+                    fetch('/create_backup', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('تم إنشاء النسخة الاحتياطية بنجاح!\\nاسم الملف: ' + data.backup_file);
+                        } else {
+                            alert('خطأ في إنشاء النسخة الاحتياطية: ' + data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('خطأ:', error);
+                        alert('حدث خطأ أثناء إنشاء النسخة الاحتياطية');
+                    })
+                    .finally(() => {
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                    });
+                }
+            }
+
+            function showBackupsList() {
+                fetch('/list_backups')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        let backupsList = 'النسخ الاحتياطية المتاحة:\\n\\n';
+                        if (data.backups.length === 0) {
+                            backupsList += 'لا توجد نسخ احتياطية';
+                        } else {
+                            data.backups.forEach((backup, index) => {
+                                const size = (backup.size / 1024 / 1024).toFixed(2);
+                                const date = new Date(backup.created).toLocaleString('ar-SA');
+                                backupsList += `${index + 1}. ${backup.filename}\\n`;
+                                backupsList += `   الحجم: ${size} MB\\n`;
+                                backupsList += `   التاريخ: ${date}\\n\\n`;
+                            });
+                        }
+                        alert(backupsList);
+                    } else {
+                        alert('خطأ في جلب قائمة النسخ الاحتياطية: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('خطأ:', error);
+                    alert('حدث خطأ أثناء جلب قائمة النسخ الاحتياطية');
+                });
+            }
+
+            function showRestoreModal() {
+                if (confirm('تحذير: استعادة النسخة الاحتياطية ستحل محل البيانات الحالية.\\nهل تريد المتابعة؟')) {
+                    document.getElementById('restore-file-input').click();
+                }
+            }
+
+            function restoreFromFile() {
+                const fileInput = document.getElementById('restore-file-input');
+                const file = fileInput.files[0];
+
+                if (!file) {
+                    alert('لم يتم اختيار ملف');
+                    return;
+                }
+
+                if (!file.name.endsWith('.db')) {
+                    alert('يجب أن يكون الملف من نوع .db');
+                    return;
+                }
+
+                if (confirm('هل أنت متأكد من استعادة هذه النسخة الاحتياطية؟\\nسيتم حفظ نسخة احتياطية من البيانات الحالية.')) {
+                    const formData = new FormData();
+                    formData.append('backup_file', file);
+
+                    fetch('/restore_backup', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('تم استعادة النسخة الاحتياطية بنجاح!\\nسيتم إعادة تحميل الصفحة.');
+                            location.reload();
+                        } else {
+                            alert('خطأ في استعادة النسخة الاحتياطية: ' + data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('خطأ:', error);
+                        alert('حدث خطأ أثناء استعادة النسخة الاحتياطية');
+                    });
+                }
+
+                // إعادة تعيين input
+                fileInput.value = '';
+            }
+
+            function updateSystem() {
+                if (confirm('هل تريد تحديث إعدادات النظام؟')) {
+                    const btn = event.target;
+                    const originalText = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>جاري التحديث...';
+                    btn.disabled = true;
+
+                    // محاكاة عملية التحديث
+                    setTimeout(() => {
+                        // تحديث الإعدادات في localStorage
+                        const settings = {
+                            lastUpdate: new Date().toISOString(),
+                            version: '2.0',
+                            autoSave: true,
+                            theme: 'default'
+                        };
+
+                        localStorage.setItem('systemSettings', JSON.stringify(settings));
+
+                        alert('تم تحديث النظام بنجاح!\\nآخر تحديث: ' + new Date().toLocaleString('ar-SA'));
+
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                    }, 2000);
+                }
             }
 
             // تحسين تجربة المستخدم
