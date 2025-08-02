@@ -829,7 +829,7 @@ def dashboard():
                             <i class="fas fa-users"></i>
                         </div>
                         <h3 class="mb-1">{{ total_customers }}</h3>
-                        <p class="text-muted mb-0">العملاء</p>
+                        <p class="text-muted mb-0">إجمالي العملاء</p>
                     </div>
                 </div>
                 <div class="col-md-3">
@@ -838,7 +838,7 @@ def dashboard():
                             <i class="fas fa-truck"></i>
                         </div>
                         <h3 class="mb-1">{{ total_suppliers }}</h3>
-                        <p class="text-muted mb-0">الموردين</p>
+                        <p class="text-muted mb-0">إجمالي الموردين</p>
                     </div>
                 </div>
                 <div class="col-md-3">
@@ -847,7 +847,7 @@ def dashboard():
                             <i class="fas fa-box"></i>
                         </div>
                         <h3 class="mb-1">{{ total_products }}</h3>
-                        <p class="text-muted mb-0">المنتجات</p>
+                        <p class="text-muted mb-0">إجمالي المنتجات</p>
                     </div>
                 </div>
                 <div class="col-md-3">
@@ -856,7 +856,7 @@ def dashboard():
                             <i class="fas fa-user-tie"></i>
                         </div>
                         <h3 class="mb-1">{{ total_employees }}</h3>
-                        <p class="text-muted mb-0">الموظفين</p>
+                        <p class="text-muted mb-0">إجمالي الموظفين</p>
                     </div>
                 </div>
             </div>
@@ -1649,7 +1649,7 @@ def products():
                                     <th>اسم المنتج</th>
                                     <th>الفئة</th>
                                     <th>سعر البيع</th>
-                                    <th>سعر التكلفة</th>
+                                    <th>سعر الشراء</th>
                                     <th>الكمية المتاحة</th>
                                     <th>الحد الأدنى</th>
                                     <th>حالة المخزون</th>
@@ -1932,7 +1932,7 @@ def sales():
                                     <th class="p-3">التاريخ</th>
                                     <th class="p-3">المبلغ الفرعي</th>
                                     <th class="p-3">الضريبة</th>
-                                    <th class="p-3">الإجمالي</th>
+                                    <th class="p-3">المبلغ الإجمالي</th>
                                     <th class="p-3">الحالة</th>
                                     <th class="p-3">الإجراءات</th>
                                 </tr>
@@ -2183,7 +2183,7 @@ def sales():
             }
 
             function deleteSale(saleId, invoiceNumber) {
-                if (confirm('هل أنت متأكد من حذف الفاتورة: ' + invoiceNumber + '؟')) {
+                if (confirm('هل أنت متأكد من حذف الفاتورة: ' + invoiceNumber + '؟\\nسيتم حذف جميع البيانات المرتبطة بها نهائياً.')) {
                     fetch('/delete_sale/' + saleId, {
                         method: 'DELETE',
                         headers: {
@@ -3803,6 +3803,9 @@ def print_settings():
                                     </button>
                                     <button type="button" class="btn btn-info" onclick="previewSettings()">
                                         <i class="fas fa-eye me-2"></i>معاينة
+                                    </button>
+                                    <button type="button" class="btn btn-primary" onclick="window.print()">
+                                        <i class="fas fa-print me-2"></i>طباعة الإعدادات
                                     </button>
                                     <button type="button" class="btn btn-success" onclick="saveSettings()">
                                         <i class="fas fa-save me-2"></i>حفظ الإعدادات
@@ -6036,6 +6039,9 @@ def sales_report():
                     <i class="fas fa-calculator me-2"></i>نظام المحاسبة الاحترافي
                 </a>
                 <div class="navbar-nav ms-auto">
+                    <button class="btn btn-light me-2" onclick="window.print()">
+                        <i class="fas fa-print me-1"></i>طباعة
+                    </button>
                     <a class="nav-link" href="{{ url_for('reports') }}">
                         <i class="fas fa-arrow-right me-1"></i>رجوع للتقارير
                     </a>
