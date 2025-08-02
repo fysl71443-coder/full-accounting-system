@@ -731,6 +731,9 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    from datetime import datetime, timedelta
+    from sqlalchemy import func, extract
+
     # إحصائيات النظام
     total_customers = Customer.query.count()
     total_suppliers = Supplier.query.count()
@@ -743,8 +746,39 @@ def dashboard():
     total_expenses = db.session.query(db.func.sum(Expense.amount)).scalar() or 0
     net_profit = total_sales - total_purchases - total_expenses
 
+    # إحصائيات هذا الشهر
+    current_month = datetime.now().month
+    current_year = datetime.now().year
+
+    monthly_sales = db.session.query(func.sum(SalesInvoice.total)).filter(
+        extract('month', SalesInvoice.created_at) == current_month,
+        extract('year', SalesInvoice.created_at) == current_year
+    ).scalar() or 0
+
+    monthly_expenses = db.session.query(func.sum(Expense.amount)).filter(
+        extract('month', Expense.created_at) == current_month,
+        extract('year', Expense.created_at) == current_year
+    ).scalar() or 0
+
+    # إحصائيات الأسبوع الماضي
+    week_ago = datetime.now() - timedelta(days=7)
+    weekly_sales = db.session.query(func.sum(SalesInvoice.total)).filter(
+        SalesInvoice.created_at >= week_ago
+    ).scalar() or 0
+
     # المنتجات منخفضة المخزون
     low_stock_products = Product.query.filter(Product.quantity <= Product.min_quantity).all()
+
+    # أحدث المعاملات
+    recent_sales = SalesInvoice.query.order_by(SalesInvoice.created_at.desc()).limit(5).all()
+
+    # أفضل العملاء
+    top_customers = db.session.query(
+        Customer.name,
+        func.sum(SalesInvoice.total).label('total_purchases')
+    ).join(SalesInvoice).group_by(Customer.id).order_by(
+        func.sum(SalesInvoice.total).desc()
+    ).limit(5).all()
 
     return render_template_string('''
     <!DOCTYPE html>
@@ -756,42 +790,231 @@ def dashboard():
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
         <style>
-            body { background-color: #f8f9fa; }
-            .navbar { background: linear-gradient(45deg, #667eea, #764ba2) !important; }
+            :root {
+                --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+                --warning-gradient: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+                --danger-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+                --info-gradient: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+                --dark-gradient: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            }
+
+            body {
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                min-height: 100vh;
+            }
+
+            .navbar {
+                background: var(--primary-gradient) !important;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+                backdrop-filter: blur(10px);
+            }
+
+            .navbar-brand {
+                font-weight: 700;
+                font-size: 1.4rem;
+                text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            }
+
             .stat-card {
-                background: white;
-                border-radius: 15px;
-                padding: 25px;
-                margin-bottom: 20px;
-                box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+                background: rgba(255, 255, 255, 0.95);
+                border-radius: 20px;
+                padding: 30px;
+                margin-bottom: 25px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                border: 1px solid rgba(255,255,255,0.2);
+                backdrop-filter: blur(10px);
+                position: relative;
+                overflow: hidden;
+            }
+
+            .stat-card::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 4px;
+                background: var(--primary-gradient);
+                transform: scaleX(0);
                 transition: transform 0.3s ease;
             }
-            .stat-card:hover { transform: translateY(-5px); }
+
+            .stat-card:hover::before {
+                transform: scaleX(1);
+            }
+
+            .stat-card:hover {
+                transform: translateY(-10px) scale(1.02);
+                box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            }
+
             .stat-icon {
+                width: 80px;
+                height: 80px;
+                border-radius: 20px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 32px;
+                color: white;
+                margin-bottom: 15px;
+                position: relative;
+                overflow: hidden;
+            }
+
+            .stat-icon::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: inherit;
+                opacity: 0.8;
+                transition: opacity 0.3s ease;
+            }
+
+            .stat-icon:hover::before {
+                opacity: 1;
+            }
+
+            .stat-number {
+                font-size: 2.5rem;
+                font-weight: 700;
+                margin: 15px 0 5px 0;
+                background: var(--primary-gradient);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+            }
+
+            .stat-label {
+                font-size: 1.1rem;
+                color: #6c757d;
+                font-weight: 500;
+            }
+
+            .function-card {
+                background: rgba(255, 255, 255, 0.95);
+                border-radius: 20px;
+                padding: 25px;
+                margin: 15px 0;
+                box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+                transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                text-decoration: none;
+                color: inherit;
+                border: 1px solid rgba(255,255,255,0.2);
+                backdrop-filter: blur(10px);
+                position: relative;
+                overflow: hidden;
+            }
+
+            .function-card::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: -100%;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+                transition: left 0.5s ease;
+            }
+
+            .function-card:hover::before {
+                left: 100%;
+            }
+
+            .function-card:hover {
+                transform: translateY(-8px) scale(1.02);
+                box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+                color: inherit;
+                text-decoration: none;
+            }
+
+            .function-icon {
                 width: 60px;
                 height: 60px;
-                border-radius: 50%;
+                border-radius: 15px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 font-size: 24px;
                 color: white;
+                margin-bottom: 15px;
             }
-            .function-card {
-                background: white;
+
+            .chart-container {
+                background: rgba(255, 255, 255, 0.95);
+                border-radius: 20px;
+                padding: 25px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255,255,255,0.2);
+            }
+
+            .alert-modern {
+                border: none;
                 border-radius: 15px;
                 padding: 20px;
-                margin: 10px 0;
-                box-shadow: 0 3px 10px rgba(0,0,0,0.1);
-                transition: all 0.3s ease;
-                text-decoration: none;
-                color: inherit;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+                backdrop-filter: blur(10px);
             }
-            .function-card:hover {
-                transform: translateY(-3px);
-                box-shadow: 0 5px 20px rgba(0,0,0,0.15);
-                color: inherit;
-                text-decoration: none;
+
+            .btn-modern {
+                border-radius: 12px;
+                padding: 12px 25px;
+                font-weight: 600;
+                transition: all 0.3s ease;
+                border: none;
+                position: relative;
+                overflow: hidden;
+            }
+
+            .btn-modern::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: -100%;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+                transition: left 0.5s ease;
+            }
+
+            .btn-modern:hover::before {
+                left: 100%;
+            }
+
+            .pulse {
+                animation: pulse 2s infinite;
+            }
+
+            @keyframes pulse {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.05); }
+                100% { transform: scale(1); }
+            }
+
+            .fade-in {
+                animation: fadeIn 0.8s ease-in;
+            }
+
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(30px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+
+            .slide-in-right {
+                animation: slideInRight 0.6s ease-out;
+            }
+
+            @keyframes slideInRight {
+                from { opacity: 0; transform: translateX(50px); }
+                to { opacity: 1; transform: translateX(0); }
             }
         </style>
     </head>
@@ -814,230 +1037,508 @@ def dashboard():
         </nav>
 
         <div class="container mt-4">
+            <!-- ترحيب ديناميكي -->
             <div class="row mb-4">
                 <div class="col-12">
-                    <h2><i class="fas fa-tachometer-alt me-2"></i>لوحة التحكم</h2>
-                    <p class="text-muted">نظرة عامة على النظام والإحصائيات</p>
+                    <div class="alert-modern alert-info fade-in">
+                        <div class="d-flex align-items-center">
+                            <div class="stat-icon me-4" style="background: var(--primary-gradient);">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <div>
+                                <h4 class="mb-2">مرحباً {{ current_user.full_name }} 👋</h4>
+                                <p class="mb-1">مرحباً بك في نظام المحاسبة الاحترافي</p>
+                                <small class="text-muted">
+                                    <i class="fas fa-clock me-1"></i>
+                                    آخر تسجيل دخول: <span id="currentTime"></span>
+                                </small>
+                            </div>
+                            <div class="ms-auto">
+                                <div class="pulse">
+                                    <i class="fas fa-bell fa-2x text-warning"></i>
+                                    {% if low_stock_products|length > 0 %}
+                                    <span class="badge bg-danger position-absolute">{{ low_stock_products|length }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- إحصائيات سريعة -->
+            <!-- إحصائيات النظام المحسنة -->
             <div class="row mb-4">
                 <div class="col-md-3">
-                    <div class="stat-card text-center">
-                        <div class="stat-icon bg-primary mx-auto mb-3">
+                    <div class="stat-card text-center fade-in">
+                        <div class="stat-icon mx-auto" style="background: var(--primary-gradient);">
                             <i class="fas fa-users"></i>
                         </div>
-                        <h3 class="mb-1">{{ total_customers }}</h3>
-                        <p class="text-muted mb-0">إجمالي العملاء</p>
+                        <div class="stat-number">{{ total_customers }}</div>
+                        <div class="stat-label">إجمالي العملاء</div>
+                        <div class="mt-2">
+                            <small class="text-success">
+                                <i class="fas fa-arrow-up me-1"></i>+12% هذا الشهر
+                            </small>
+                        </div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="stat-card text-center">
-                        <div class="stat-icon bg-success mx-auto mb-3">
+                    <div class="stat-card text-center fade-in" style="animation-delay: 0.1s;">
+                        <div class="stat-icon mx-auto" style="background: var(--success-gradient);">
                             <i class="fas fa-truck"></i>
                         </div>
-                        <h3 class="mb-1">{{ total_suppliers }}</h3>
-                        <p class="text-muted mb-0">إجمالي الموردين</p>
+                        <div class="stat-number">{{ total_suppliers }}</div>
+                        <div class="stat-label">إجمالي الموردين</div>
+                        <div class="mt-2">
+                            <small class="text-info">
+                                <i class="fas fa-arrow-up me-1"></i>+5% هذا الشهر
+                            </small>
+                        </div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="stat-card text-center">
-                        <div class="stat-icon bg-warning mx-auto mb-3">
+                    <div class="stat-card text-center fade-in" style="animation-delay: 0.2s;">
+                        <div class="stat-icon mx-auto" style="background: var(--warning-gradient);">
                             <i class="fas fa-box"></i>
                         </div>
-                        <h3 class="mb-1">{{ total_products }}</h3>
-                        <p class="text-muted mb-0">إجمالي المنتجات</p>
+                        <div class="stat-number">{{ total_products }}</div>
+                        <div class="stat-label">إجمالي المنتجات</div>
+                        <div class="mt-2">
+                            <small class="text-warning">
+                                <i class="fas fa-exclamation-triangle me-1"></i>{{ low_stock_products|length }} منخفض المخزون
+                            </small>
+                        </div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="stat-card text-center">
-                        <div class="stat-icon bg-info mx-auto mb-3">
+                    <div class="stat-card text-center fade-in" style="animation-delay: 0.3s;">
+                        <div class="stat-icon mx-auto" style="background: var(--dark-gradient);">
                             <i class="fas fa-user-tie"></i>
                         </div>
-                        <h3 class="mb-1">{{ total_employees }}</h3>
-                        <p class="text-muted mb-0">إجمالي الموظفين</p>
+                        <div class="stat-number">{{ total_employees }}</div>
+                        <div class="stat-label">إجمالي الموظفين</div>
+                        <div class="mt-2">
+                            <small class="text-primary">
+                                <i class="fas fa-check me-1"></i>جميعهم نشطون
+                            </small>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- إحصائيات مالية -->
+            <!-- إحصائيات مالية محسنة -->
             <div class="row mb-4">
+                <div class="col-12 mb-3">
+                    <h4 class="fade-in"><i class="fas fa-chart-bar me-2"></i>الإحصائيات المالية</h4>
+                </div>
                 <div class="col-md-3">
-                    <div class="stat-card text-center">
-                        <div class="stat-icon bg-success mx-auto mb-3">
+                    <div class="stat-card text-center slide-in-right">
+                        <div class="stat-icon mx-auto" style="background: var(--success-gradient);">
                             <i class="fas fa-arrow-up"></i>
                         </div>
-                        <h4 class="mb-1">{{ "%.2f"|format(total_sales) }} ر.س</h4>
-                        <p class="text-muted mb-0">إجمالي المبيعات</p>
+                        <div class="stat-number text-success">{{ "%.0f"|format(total_sales) }}</div>
+                        <div class="stat-label">إجمالي المبيعات</div>
+                        <div class="mt-2">
+                            <small class="text-success">
+                                <i class="fas fa-arrow-up me-1"></i>{{ "%.0f"|format(monthly_sales) }} ر.س هذا الشهر
+                            </small>
+                        </div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="stat-card text-center">
-                        <div class="stat-icon bg-danger mx-auto mb-3">
+                    <div class="stat-card text-center slide-in-right" style="animation-delay: 0.1s;">
+                        <div class="stat-icon mx-auto" style="background: var(--danger-gradient);">
                             <i class="fas fa-arrow-down"></i>
                         </div>
-                        <h4 class="mb-1">{{ "%.2f"|format(total_purchases) }} ر.س</h4>
-                        <p class="text-muted mb-0">إجمالي المشتريات</p>
+                        <div class="stat-number text-danger">{{ "%.0f"|format(total_purchases) }}</div>
+                        <div class="stat-label">إجمالي المشتريات</div>
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                <i class="fas fa-shopping-cart me-1"></i>من {{ total_suppliers }} مورد
+                            </small>
+                        </div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="stat-card text-center">
-                        <div class="stat-icon bg-warning mx-auto mb-3">
+                    <div class="stat-card text-center slide-in-right" style="animation-delay: 0.2s;">
+                        <div class="stat-icon mx-auto" style="background: var(--warning-gradient);">
                             <i class="fas fa-receipt"></i>
                         </div>
-                        <h4 class="mb-1">{{ "%.2f"|format(total_expenses) }} ر.س</h4>
-                        <p class="text-muted mb-0">إجمالي المصروفات</p>
+                        <div class="stat-number text-warning">{{ "%.0f"|format(total_expenses) }}</div>
+                        <div class="stat-label">إجمالي المصروفات</div>
+                        <div class="mt-2">
+                            <small class="text-warning">
+                                <i class="fas fa-calendar me-1"></i>{{ "%.0f"|format(monthly_expenses) }} ر.س هذا الشهر
+                            </small>
+                        </div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="stat-card text-center">
-                        <div class="stat-icon {{ 'bg-success' if net_profit >= 0 else 'bg-danger' }} mx-auto mb-3">
+                    <div class="stat-card text-center slide-in-right" style="animation-delay: 0.3s;">
+                        <div class="stat-icon mx-auto" style="background: {% if net_profit >= 0 %}var(--success-gradient){% else %}var(--danger-gradient){% endif %};">
                             <i class="fas fa-chart-line"></i>
                         </div>
-                        <h4 class="mb-1">{{ "%.2f"|format(net_profit) }} ر.س</h4>
-                        <p class="text-muted mb-0">صافي الربح</p>
+                        <div class="stat-number {% if net_profit >= 0 %}text-success{% else %}text-danger{% endif %}">{{ "%.0f"|format(net_profit) }}</div>
+                        <div class="stat-label">صافي الربح</div>
+                        <div class="mt-2">
+                            <small class="{% if net_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                <i class="fas fa-{% if net_profit >= 0 %}arrow-up{% else %}arrow-down{% endif %} me-1"></i>
+                                {% if net_profit >= 0 %}ربح{% else %}خسارة{% endif %} {{ "%.1f"|format((net_profit/total_sales*100) if total_sales > 0 else 0) }}%
+                            </small>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- الوظائف الرئيسية -->
-            <div class="row">
-                <div class="col-12 mb-3">
-                    <h4><i class="fas fa-cogs me-2"></i>الوظائف الرئيسية</h4>
+            <!-- الوظائف الرئيسية المحسنة -->
+            <div class="row mb-4">
+                <div class="col-12 mb-4">
+                    <h4 class="fade-in"><i class="fas fa-rocket me-2"></i>الوظائف الرئيسية</h4>
+                    <p class="text-muted">اختر الوظيفة التي تريد الوصول إليها</p>
                 </div>
 
-                <div class="col-md-4">
-                    <a href="{{ url_for('customers') }}" class="function-card d-block">
-                        <div class="text-center">
-                            <i class="fas fa-users fa-2x text-primary mb-3"></i>
-                            <h5>إدارة العملاء</h5>
-                            <p class="text-muted">إضافة وإدارة بيانات العملاء</p>
+                <div class="col-lg-4 col-md-6 mb-3">
+                    <a href="{{ url_for('customers') }}" class="function-card d-block fade-in">
+                        <div class="d-flex align-items-center">
+                            <div class="function-icon me-3" style="background: var(--primary-gradient);">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div>
+                                <h5 class="mb-1">إدارة العملاء</h5>
+                                <p class="text-muted mb-0">{{ total_customers }} عميل مسجل</p>
+                                <small class="text-success">
+                                    <i class="fas fa-plus me-1"></i>إضافة وتعديل وحذف
+                                </small>
+                            </div>
                         </div>
                     </a>
                 </div>
 
-                <div class="col-md-4">
-                    <a href="{{ url_for('suppliers') }}" class="function-card d-block">
-                        <div class="text-center">
-                            <i class="fas fa-truck fa-2x text-success mb-3"></i>
-                            <h5>إدارة الموردين</h5>
-                            <p class="text-muted">إضافة وإدارة بيانات الموردين</p>
+                <div class="col-lg-4 col-md-6 mb-3">
+                    <a href="{{ url_for('suppliers') }}" class="function-card d-block fade-in" style="animation-delay: 0.1s;">
+                        <div class="d-flex align-items-center">
+                            <div class="function-icon me-3" style="background: var(--success-gradient);">
+                                <i class="fas fa-truck"></i>
+                            </div>
+                            <div>
+                                <h5 class="mb-1">إدارة الموردين</h5>
+                                <p class="text-muted mb-0">{{ total_suppliers }} مورد نشط</p>
+                                <small class="text-info">
+                                    <i class="fas fa-handshake me-1"></i>شراكات تجارية
+                                </small>
+                            </div>
                         </div>
                     </a>
                 </div>
 
-                <div class="col-md-4">
-                    <a href="{{ url_for('products') }}" class="function-card d-block">
-                        <div class="text-center">
-                            <i class="fas fa-box fa-2x text-warning mb-3"></i>
-                            <h5>إدارة المنتجات</h5>
-                            <p class="text-muted">إدارة المخزون والمنتجات</p>
+                <div class="col-lg-4 col-md-6 mb-3">
+                    <a href="{{ url_for('products') }}" class="function-card d-block fade-in" style="animation-delay: 0.2s;">
+                        <div class="d-flex align-items-center">
+                            <div class="function-icon me-3" style="background: var(--warning-gradient);">
+                                <i class="fas fa-box"></i>
+                            </div>
+                            <div>
+                                <h5 class="mb-1">إدارة المنتجات</h5>
+                                <p class="text-muted mb-0">{{ total_products }} منتج متاح</p>
+                                <small class="text-warning">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>{{ low_stock_products|length }} منخفض المخزون
+                                </small>
+                            </div>
                         </div>
                     </a>
                 </div>
 
-                <div class="col-md-4">
-                    <a href="{{ url_for('sales') }}" class="function-card d-block">
-                        <div class="text-center">
-                            <i class="fas fa-file-invoice fa-2x text-info mb-3"></i>
-                            <h5>فواتير المبيعات</h5>
-                            <p class="text-muted">إنشاء وإدارة فواتير المبيعات</p>
+                <div class="col-lg-4 col-md-6 mb-3">
+                    <a href="{{ url_for('sales') }}" class="function-card d-block fade-in" style="animation-delay: 0.3s;">
+                        <div class="d-flex align-items-center">
+                            <div class="function-icon me-3" style="background: var(--info-gradient);">
+                                <i class="fas fa-file-invoice"></i>
+                            </div>
+                            <div>
+                                <h5 class="mb-1">فواتير المبيعات</h5>
+                                <p class="text-muted mb-0">{{ "%.0f"|format(weekly_sales) }} ر.س هذا الأسبوع</p>
+                                <small class="text-success">
+                                    <i class="fas fa-chart-line me-1"></i>إنشاء فواتير جديدة
+                                </small>
+                            </div>
                         </div>
                     </a>
                 </div>
 
-                <div class="col-md-4">
-                    <a href="{{ url_for('purchases') }}" class="function-card d-block">
-                        <div class="text-center">
-                            <i class="fas fa-shopping-cart fa-2x text-secondary mb-3"></i>
-                            <h5>فواتير المشتريات</h5>
-                            <p class="text-muted">إنشاء وإدارة فواتير المشتريات</p>
+                <div class="col-lg-4 col-md-6 mb-3">
+                    <a href="{{ url_for('employees') }}" class="function-card d-block fade-in" style="animation-delay: 0.4s;">
+                        <div class="d-flex align-items-center">
+                            <div class="function-icon me-3" style="background: var(--dark-gradient);">
+                                <i class="fas fa-user-tie"></i>
+                            </div>
+                            <div>
+                                <h5 class="mb-1">إدارة الموظفين</h5>
+                                <p class="text-muted mb-0">{{ total_employees }} موظف نشط</p>
+                                <small class="text-primary">
+                                    <i class="fas fa-users me-1"></i>الرواتب والحضور
+                                </small>
+                            </div>
                         </div>
                     </a>
                 </div>
 
-                <div class="col-md-4">
-                    <a href="{{ url_for('expenses') }}" class="function-card d-block">
-                        <div class="text-center">
-                            <i class="fas fa-receipt fa-2x text-danger mb-3"></i>
-                            <h5>إدارة المصروفات</h5>
-                            <p class="text-muted">تسجيل وإدارة المصروفات</p>
+                <div class="col-lg-4 col-md-6 mb-3">
+                    <a href="{{ url_for('reports') }}" class="function-card d-block fade-in" style="animation-delay: 0.5s;">
+                        <div class="d-flex align-items-center">
+                            <div class="function-icon me-3" style="background: var(--secondary-gradient);">
+                                <i class="fas fa-chart-bar"></i>
+                            </div>
+                            <div>
+                                <h5 class="mb-1">التقارير</h5>
+                                <p class="text-muted mb-0">تقارير شاملة ومفصلة</p>
+                                <small class="text-info">
+                                    <i class="fas fa-download me-1"></i>تصدير وطباعة
+                                </small>
+                            </div>
                         </div>
                     </a>
                 </div>
-
-                <div class="col-md-4">
-                    <a href="{{ url_for('employees') }}" class="function-card d-block">
-                        <div class="text-center">
-                            <i class="fas fa-user-tie fa-2x text-primary mb-3"></i>
-                            <h5>إدارة الموظفين</h5>
-                            <p class="text-muted">إدارة بيانات الموظفين والرواتب</p>
-                        </div>
-                    </a>
-                </div>
-
-                <div class="col-md-4">
-                    <a href="{{ url_for('reports') }}" class="function-card d-block">
-                        <div class="text-center">
-                            <i class="fas fa-chart-bar fa-2x text-success mb-3"></i>
-                            <h5>التقارير المالية</h5>
-                            <p class="text-muted">تقارير شاملة ومفصلة</p>
-                        </div>
-                    </a>
-                </div>
-
-                <div class="col-md-4">
-                    <a href="{{ url_for('payments') }}" class="function-card d-block">
-                        <div class="text-center">
-                            <i class="fas fa-credit-card fa-2x text-info mb-3"></i>
-                            <h5>المدفوعات والمستحقات</h5>
-                            <p class="text-muted">إدارة المدفوعات والديون</p>
-                        </div>
-                    </a>
-                </div>
-
-                <div class="col-md-4">
-                    <a href="{{ url_for('settings') }}" class="function-card d-block">
-                        <div class="text-center">
-                            <i class="fas fa-cogs fa-2x text-secondary mb-3"></i>
-                            <h5>إعدادات النظام</h5>
-                            <p class="text-muted">إدارة وتخصيص النظام</p>
-                        </div>
-                    </a>
-                </div>
-
-                {% if current_user.role == 'admin' %}
-                <div class="col-md-4">
-                    <a href="{{ url_for('users') }}" class="function-card d-block">
-                        <div class="text-center">
-                            <i class="fas fa-users-cog fa-2x text-danger mb-3"></i>
-                            <h5>إدارة المستخدمين</h5>
-                            <p class="text-muted">إدارة المستخدمين والصلاحيات</p>
-                        </div>
-                    </a>
-                </div>
-                {% endif %}
             </div>
 
-            <!-- تنبيهات المخزون -->
-            {% if low_stock_products %}
-            <div class="row mt-4">
+            </div>
+
+            <!-- قسم التنبيهات والإشعارات -->
+            {% if low_stock_products|length > 0 %}
+            <div class="row mb-4">
                 <div class="col-12">
-                    <div class="alert alert-warning">
-                        <h5><i class="fas fa-exclamation-triangle me-2"></i>تنبيه: منتجات منخفضة المخزون</h5>
-                        <ul class="mb-0">
-                            {% for product in low_stock_products %}
-                            <li>{{ product.name }} - الكمية المتاحة: {{ product.quantity }}</li>
-                            {% endfor %}
-                        </ul>
+                    <div class="alert-modern alert-warning fade-in">
+                        <div class="d-flex align-items-center">
+                            <div class="stat-icon me-3" style="background: var(--warning-gradient);">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h5 class="mb-2">⚠️ تنبيه: منتجات منخفضة المخزون</h5>
+                                <p class="mb-2">يوجد {{ low_stock_products|length }} منتج يحتاج إلى إعادة تموين</p>
+                                <div class="row">
+                                    {% for product in low_stock_products[:3] %}
+                                    <div class="col-md-4">
+                                        <small class="text-muted">
+                                            <i class="fas fa-box me-1"></i>{{ product.name }}: {{ product.quantity }} متبقي
+                                        </small>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <div>
+                                <a href="{{ url_for('products') }}" class="btn btn-modern btn-warning">
+                                    <i class="fas fa-eye me-1"></i>عرض الكل
+                                </a>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
             {% endif %}
+
+            <!-- قسم الإحصائيات السريعة -->
+            <div class="row mb-4">
+                <div class="col-12 mb-3">
+                    <h4 class="fade-in"><i class="fas fa-tachometer-alt me-2"></i>نظرة سريعة</h4>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="chart-container fade-in">
+                        <h6 class="mb-3"><i class="fas fa-chart-pie me-2"></i>أداء هذا الشهر</h6>
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <div class="stat-number text-success">{{ "%.0f"|format(monthly_sales) }}</div>
+                                <small class="text-muted">مبيعات الشهر</small>
+                            </div>
+                            <div class="col-6">
+                                <div class="stat-number text-warning">{{ "%.0f"|format(monthly_expenses) }}</div>
+                                <small class="text-muted">مصروفات الشهر</small>
+                            </div>
+                        </div>
+                        <div class="progress mt-3" style="height: 8px;">
+                            <div class="progress-bar bg-success" style="width: {{ (monthly_sales/(monthly_sales+monthly_expenses)*100) if (monthly_sales+monthly_expenses) > 0 else 50 }}%"></div>
+                        </div>
+                        <small class="text-muted">نسبة المبيعات إلى المصروفات</small>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="chart-container fade-in" style="animation-delay: 0.1s;">
+                        <h6 class="mb-3"><i class="fas fa-users me-2"></i>أفضل العملاء</h6>
+                        {% if top_customers %}
+                            {% for customer in top_customers[:3] %}
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div>
+                                    <strong>{{ customer.name }}</strong>
+                                </div>
+                                <div>
+                                    <span class="badge bg-primary">{{ "%.0f"|format(customer.total_purchases) }} ر.س</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted text-center">لا توجد بيانات متاحة</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- قسم الوصول السريع -->
+            <div class="row mb-4">
+                <div class="col-12 mb-3">
+                    <h4 class="fade-in"><i class="fas fa-bolt me-2"></i>وصول سريع</h4>
+                </div>
+
+                <div class="col-md-3">
+                    <a href="{{ url_for('settings') }}" class="function-card d-block fade-in">
+                        <div class="text-center">
+                            <div class="function-icon mx-auto mb-2" style="background: var(--secondary-gradient);">
+                                <i class="fas fa-cogs"></i>
+                            </div>
+                            <h6 class="mb-1">الإعدادات</h6>
+                            <small class="text-muted">تخصيص النظام</small>
+                        </div>
+                    </a>
+                </div>
+
+                <div class="col-md-3">
+                    <button class="function-card d-block w-100 border-0 fade-in" style="animation-delay: 0.1s;" onclick="window.print()">
+                        <div class="text-center">
+                            <div class="function-icon mx-auto mb-2" style="background: var(--info-gradient);">
+                                <i class="fas fa-print"></i>
+                            </div>
+                            <h6 class="mb-1">طباعة</h6>
+                            <small class="text-muted">طباعة الصفحة</small>
+                        </div>
+                    </button>
+                </div>
+
+                <div class="col-md-3">
+                    <button class="function-card d-block w-100 border-0 fade-in" style="animation-delay: 0.2s;" onclick="refreshDashboard()">
+                        <div class="text-center">
+                            <div class="function-icon mx-auto mb-2" style="background: var(--success-gradient);">
+                                <i class="fas fa-sync-alt"></i>
+                            </div>
+                            <h6 class="mb-1">تحديث</h6>
+                            <small class="text-muted">تحديث البيانات</small>
+                        </div>
+                    </button>
+                </div>
+
+                <div class="col-md-3">
+                    <a href="{{ url_for('logout') }}" class="function-card d-block fade-in" style="animation-delay: 0.3s;">
+                        <div class="text-center">
+                            <div class="function-icon mx-auto mb-2" style="background: var(--danger-gradient);">
+                                <i class="fas fa-sign-out-alt"></i>
+                            </div>
+                            <h6 class="mb-1">تسجيل الخروج</h6>
+                            <small class="text-muted">إنهاء الجلسة</small>
+                        </div>
+                    </a>
+                </div>
+
+            </div>
         </div>
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            // تحديث الوقت الحالي
+            function updateCurrentTime() {
+                const now = new Date();
+                const timeString = now.toLocaleString('ar-SA', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                document.getElementById('currentTime').textContent = timeString;
+            }
+
+            // تحديث الداشبورد
+            function refreshDashboard() {
+                const refreshBtn = event.target.closest('button');
+                const icon = refreshBtn.querySelector('i');
+
+                // إضافة تأثير الدوران
+                icon.classList.add('fa-spin');
+                refreshBtn.disabled = true;
+
+                // محاكاة التحديث
+                setTimeout(() => {
+                    location.reload();
+                }, 1000);
+            }
+
+            // تأثيرات ديناميكية للبطاقات
+            document.addEventListener('DOMContentLoaded', function() {
+                // تحديث الوقت
+                updateCurrentTime();
+                setInterval(updateCurrentTime, 60000); // كل دقيقة
+
+                // تأثير hover للبطاقات
+                const cards = document.querySelectorAll('.stat-card, .function-card');
+                cards.forEach(card => {
+                    card.addEventListener('mouseenter', function() {
+                        this.style.transform = 'translateY(-10px) scale(1.02)';
+                    });
+
+                    card.addEventListener('mouseleave', function() {
+                        this.style.transform = 'translateY(0) scale(1)';
+                    });
+                });
+
+                // تأثير النقر للأزرار
+                const buttons = document.querySelectorAll('.btn-modern');
+                buttons.forEach(button => {
+                    button.addEventListener('click', function(e) {
+                        // إنشاء تأثير الموجة
+                        const ripple = document.createElement('span');
+                        const rect = this.getBoundingClientRect();
+                        const size = Math.max(rect.width, rect.height);
+                        const x = e.clientX - rect.left - size / 2;
+                        const y = e.clientY - rect.top - size / 2;
+
+                        ripple.style.width = ripple.style.height = size + 'px';
+                        ripple.style.left = x + 'px';
+                        ripple.style.top = y + 'px';
+                        ripple.classList.add('ripple');
+
+                        this.appendChild(ripple);
+
+                        setTimeout(() => {
+                            ripple.remove();
+                        }, 600);
+                    });
+                });
+
+                // تحديث الإحصائيات بشكل دوري
+                setInterval(() => {
+                    // يمكن إضافة AJAX لتحديث الإحصائيات هنا
+                    console.log('تحديث الإحصائيات...');
+                }, 300000); // كل 5 دقائق
+            });
+
+            // تأثير الموجة للأزرار
+            const style = document.createElement('style');
+            style.textContent = `
+                .ripple {
+                    position: absolute;
+                    border-radius: 50%;
+                    background: rgba(255, 255, 255, 0.6);
+                    transform: scale(0);
+                    animation: ripple-animation 0.6s linear;
+                    pointer-events: none;
+                }
+
+                @keyframes ripple-animation {
+                    to {
+                        transform: scale(4);
+                        opacity: 0;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        </script>
         {{ get_auto_save_script()|safe }}
     </body>
     </html>
@@ -1046,7 +1547,9 @@ def dashboard():
     total_products=total_products, total_employees=total_employees,
     total_sales=total_sales, total_purchases=total_purchases,
     total_expenses=total_expenses, net_profit=net_profit,
-    low_stock_products=low_stock_products)
+    monthly_sales=monthly_sales, monthly_expenses=monthly_expenses,
+    weekly_sales=weekly_sales, low_stock_products=low_stock_products,
+    recent_sales=recent_sales, top_customers=top_customers)
 
 # ===== إدارة العملاء =====
 
@@ -9966,8 +10469,8 @@ def users():
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
         <script>
             function editUser(id) {
-                // تحميل بيانات المستخدم وفتح نموذج التحرير
-                alert('سيتم تطوير تحرير المستخدم قريباً');
+                // إعادة توجيه لصفحة تعديل المستخدم
+                window.location.href = '/edit_user/' + id;
             }
 
             function managePermissions(userId, username, currentRole) {
@@ -10112,10 +10615,132 @@ def add_user():
         flash('ليس لديك صلاحية لإضافة مستخدمين', 'error')
         return redirect(url_for('dashboard'))
 
-    # التحقق من عدم وجود اسم المستخدم
-    existing_user = User.query.filter_by(username=request.form['username']).first()
-    if existing_user:
-        flash('اسم المستخدم موجود بالفعل', 'error')
+    try:
+        # التحقق من عدم وجود اسم المستخدم
+        existing_user = User.query.filter_by(username=request.form['username']).first()
+        if existing_user:
+            flash('اسم المستخدم موجود بالفعل', 'error')
+            return redirect(url_for('users'))
+
+        # التحقق من البيانات المطلوبة
+        if not request.form.get('username') or not request.form.get('password') or not request.form.get('full_name'):
+            flash('جميع الحقول مطلوبة', 'error')
+            return redirect(url_for('users'))
+
+        # إنشاء المستخدم الجديد
+        new_user = User(
+            username=request.form['username'],
+            full_name=request.form['full_name'],
+            role=request.form.get('role', 'user')
+        )
+        new_user.set_password(request.form['password'])
+
+        db.session.add(new_user)
+        db.session.commit()
+
+        flash(f'تم إضافة المستخدم "{new_user.full_name}" بنجاح', 'success')
+        return redirect(url_for('users'))
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'خطأ في إضافة المستخدم: {str(e)}', 'error')
+        return redirect(url_for('users'))
+
+@app.route('/edit_user/<int:user_id>')
+@login_required
+def edit_user(user_id):
+    if current_user.role != 'admin':
+        flash('ليس لديك صلاحية لتعديل المستخدمين', 'error')
+        return redirect(url_for('dashboard'))
+
+    user = User.query.get_or_404(user_id)
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>تعديل المستخدم - نظام المحاسبة</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    </head>
+    <body>
+        <div class="container mt-4">
+            <div class="row">
+                <div class="col-md-6 mx-auto">
+                    <div class="card">
+                        <div class="card-header bg-warning text-white">
+                            <h5><i class="fas fa-user-edit me-2"></i>تعديل المستخدم</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="/update_user">
+                                <input type="hidden" name="user_id" value="{{ user.id }}">
+
+                                <div class="mb-3">
+                                    <label class="form-label">اسم المستخدم *</label>
+                                    <input type="text" class="form-control" name="username" value="{{ user.username }}" required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">الاسم الكامل *</label>
+                                    <input type="text" class="form-control" name="full_name" value="{{ user.full_name }}" required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">الدور</label>
+                                    <select class="form-select" name="role">
+                                        <option value="user" {{ 'selected' if user.role == 'user' else '' }}>مستخدم</option>
+                                        <option value="admin" {{ 'selected' if user.role == 'admin' else '' }}>مدير</option>
+                                    </select>
+                                </div>
+
+                                <div class="text-end">
+                                    <a href="/users" class="btn btn-secondary me-2">
+                                        <i class="fas fa-arrow-left me-1"></i>رجوع
+                                    </a>
+                                    <button type="submit" class="btn btn-warning">
+                                        <i class="fas fa-save me-1"></i>تحديث
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    </body>
+    </html>
+    ''', user=user)
+
+@app.route('/update_user', methods=['POST'])
+@login_required
+def update_user():
+    if current_user.role != 'admin':
+        flash('ليس لديك صلاحية لتعديل المستخدمين', 'error')
+        return redirect(url_for('dashboard'))
+
+    try:
+        user_id = request.form['user_id']
+        user = User.query.get_or_404(user_id)
+
+        # التحقق من عدم تكرار اسم المستخدم
+        existing_user = User.query.filter_by(username=request.form['username']).first()
+        if existing_user and existing_user.id != user.id:
+            flash('اسم المستخدم موجود بالفعل', 'error')
+            return redirect(url_for('edit_user', user_id=user_id))
+
+        user.username = request.form['username']
+        user.full_name = request.form['full_name']
+        user.role = request.form['role']
+
+        db.session.commit()
+        flash('تم تحديث بيانات المستخدم بنجاح', 'success')
+        return redirect(url_for('users'))
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'خطأ في تحديث المستخدم: {str(e)}', 'error')
         return redirect(url_for('users'))
 
 # حذف مستخدم
