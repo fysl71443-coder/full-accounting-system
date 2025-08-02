@@ -63,23 +63,6 @@ app.config['LANGUAGES'] = {
 app.config['BABEL_DEFAULT_LOCALE'] = 'ar'
 app.config['BABEL_DEFAULT_TIMEZONE'] = 'UTC'
 
-# إعدادات الفروع
-app.config['BRANCHES'] = {
-    'Place India': {
-        'name_ar': 'بليس إنديا',
-        'name_en': 'Place India',
-        'icon': '🇮🇳',
-        'color': '#FF6B35'
-    },
-    'China Town': {
-        'name_ar': 'تشاينا تاون',
-        'name_en': 'China Town',
-        'icon': '🏮',
-        'color': '#DC143C'
-    }
-}
-app.config['DEFAULT_BRANCH'] = 'Place India'
-
 # إنشاء مجلد الرفع إذا لم يكن موجوداً
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
@@ -138,25 +121,6 @@ def get_available_languages():
     """الحصول على اللغات المتاحة"""
     return app.config['LANGUAGES']
 
-# وظائف مساعدة للفروع
-def get_current_branch():
-    """الحصول على الفرع الحالي"""
-    return session.get('current_branch', app.config['DEFAULT_BRANCH'])
-
-def get_available_branches():
-    """الحصول على الفروع المتاحة"""
-    return app.config['BRANCHES']
-
-def get_branch_info(branch_name):
-    """الحصول على معلومات فرع معين"""
-    return app.config['BRANCHES'].get(branch_name, app.config['BRANCHES']['Place India'])
-
-def get_branch_display_name(branch_name):
-    """الحصول على اسم الفرع للعرض حسب اللغة"""
-    branch_info = get_branch_info(branch_name)
-    current_lang = get_locale()
-    return branch_info.get(f'name_{current_lang}', branch_name)
-
 # تسجيل الدوال المساعدة مع Jinja2
 app.jinja_env.globals.update(
     format_date=format_date,
@@ -165,11 +129,7 @@ app.jinja_env.globals.update(
     now=datetime.now,
     _=gettext,  # وظيفة الترجمة
     get_locale=get_locale,  # الحصول على اللغة الحالية
-    get_available_languages=get_available_languages,  # اللغات المتاحة
-    get_current_branch=get_current_branch,  # الحصول على الفرع الحالي
-    get_available_branches=get_available_branches,  # الفروع المتاحة
-    get_branch_info=get_branch_info,  # معلومات الفرع
-    get_branch_display_name=get_branch_display_name  # اسم الفرع للعرض
+    get_available_languages=get_available_languages  # اللغات المتاحة
 )
 
 @login_manager.user_loader
@@ -233,7 +193,6 @@ class SalesInvoice(db.Model):
     total = db.Column(db.Numeric(10, 2), nullable=False)
     payment_method = db.Column(db.String(20), default='cash')  # mada,bank,visa,cash,mastercard,aks,gcc,stc
     status = db.Column(db.String(20), default='pending')
-    branch = db.Column(db.String(50), default='Place India', nullable=False)  # الفرع: Place India أو China Town
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -815,32 +774,23 @@ def dashboard():
     from datetime import datetime, timedelta
     from sqlalchemy import func, extract
 
-    # الحصول على الفرع الحالي
-    current_branch = get_current_branch()
-
-    # إحصائيات النظام (مشتركة بين الفروع)
+    # إحصائيات النظام
     total_customers = Customer.query.count()
     total_suppliers = Supplier.query.count()
     total_products = Product.query.count()
     total_employees = Employee.query.count()
 
-    # إحصائيات مالية حسب الفرع
-    branch_sales = db.session.query(db.func.sum(SalesInvoice.total)).filter(
-        SalesInvoice.branch == current_branch
-    ).scalar() or 0
-
-    # إحصائيات عامة (جميع الفروع)
+    # إحصائيات مالية
     total_sales = db.session.query(db.func.sum(SalesInvoice.total)).scalar() or 0
     total_purchases = db.session.query(db.func.sum(PurchaseInvoice.total)).scalar() or 0
     total_expenses = db.session.query(db.func.sum(Expense.amount)).scalar() or 0
     net_profit = total_sales - total_purchases - total_expenses
 
-    # إحصائيات هذا الشهر للفرع الحالي
+    # إحصائيات هذا الشهر
     current_month = datetime.now().month
     current_year = datetime.now().year
 
     monthly_sales = db.session.query(func.sum(SalesInvoice.total)).filter(
-        SalesInvoice.branch == current_branch,
         extract('month', SalesInvoice.created_at) == current_month,
         extract('year', SalesInvoice.created_at) == current_year
     ).scalar() or 0
@@ -850,10 +800,9 @@ def dashboard():
         extract('year', Expense.created_at) == current_year
     ).scalar() or 0
 
-    # إحصائيات الأسبوع الماضي للفرع الحالي
+    # إحصائيات الأسبوع الماضي
     week_ago = datetime.now() - timedelta(days=7)
     weekly_sales = db.session.query(func.sum(SalesInvoice.total)).filter(
-        SalesInvoice.branch == current_branch,
         SalesInvoice.created_at >= week_ago
     ).scalar() or 0
 
@@ -1174,62 +1123,6 @@ def dashboard():
                 opacity: 1 !important;
                 visibility: visible !important;
             }
-
-            /* مبدل الفروع */
-            .branch-btn {
-                background: #ffc107 !important;
-                color: #212529 !important;
-                border: 2px solid #ffca2c !important;
-                font-weight: 600 !important;
-                transition: all 0.3s ease !important;
-                box-shadow: 0 2px 4px rgba(255,193,7,0.3) !important;
-            }
-
-            .branch-btn:hover,
-            .branch-btn:focus,
-            .branch-btn.show {
-                background: #ffcd39 !important;
-                color: #000 !important;
-                border-color: #ffc720 !important;
-                box-shadow: 0 4px 8px rgba(255,193,7,0.4) !important;
-                transform: translateY(-1px) !important;
-            }
-
-            .branch-menu {
-                background: white !important;
-                border: 1px solid #dee2e6 !important;
-                border-radius: 8px !important;
-                padding: 8px 0 !important;
-                margin-top: 5px !important;
-                box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
-            }
-
-            .branch-option {
-                padding: 12px 16px !important;
-                color: #333 !important;
-                font-weight: 500 !important;
-                transition: all 0.2s ease !important;
-                display: flex !important;
-                align-items: center !important;
-            }
-
-            .branch-option:hover {
-                background: #fff3cd !important;
-                color: #856404 !important;
-                padding-left: 20px !important;
-            }
-
-            .branch-option.active {
-                background: #fff3cd !important;
-                color: #856404 !important;
-                font-weight: 600 !important;
-                border-left: 4px solid #ffc107 !important;
-            }
-
-            .branch-option .branch-icon {
-                font-size: 18px !important;
-                margin-right: 8px !important;
-            }
         </style>
     </head>
     <body>
@@ -1240,27 +1133,6 @@ def dashboard():
                     <span>{% if get_locale() == 'ar' %}نظام المحاسبة الاحترافي{% else %}Professional Accounting System{% endif %}</span>
                 </a>
                 <div class="navbar-nav ms-auto">
-                    <!-- مبدل الفروع -->
-                    <div class="dropdown me-3">
-                        <button class="btn btn-warning btn-sm dropdown-toggle branch-btn" type="button" id="branchDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="min-width: 140px;">
-                            {% set current_branch_info = get_branch_info(get_current_branch()) %}
-                            <span class="me-2">{{ current_branch_info.icon }}</span>
-                            <span id="currentBranch">{{ get_branch_display_name(get_current_branch()) }}</span>
-                        </button>
-                        <ul class="dropdown-menu branch-menu shadow" aria-labelledby="branchDropdown" style="min-width: 180px;">
-                            {% for branch_key, branch_info in get_available_branches().items() %}
-                            <li>
-                                <a class="dropdown-item branch-option {% if get_current_branch() == branch_key %}active{% endif %}" href="{{ url_for('change_branch', branch=branch_key) }}">
-                                    <i class="fas fa-check text-success me-2 {% if get_current_branch() != branch_key %}invisible{% endif %}"></i>
-                                    <span class="branch-icon">{{ branch_info.icon }}</span>
-                                    <span class="ms-2">{{ branch_info.name_ar if get_locale() == 'ar' else branch_info.name_en }}</span>
-                                </a>
-                            </li>
-                            {% if not loop.last %}<li><hr class="dropdown-divider my-1"></li>{% endif %}
-                            {% endfor %}
-                        </ul>
-                    </div>
-
                     <!-- مبدل اللغة الواضح -->
                     <div class="dropdown me-3">
                         <button class="btn btn-light btn-sm dropdown-toggle language-btn" type="button" id="languageDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="min-width: 120px;">
@@ -1933,9 +1805,8 @@ def dashboard():
     total_sales=total_sales, total_purchases=total_purchases,
     total_expenses=total_expenses, net_profit=net_profit,
     monthly_sales=monthly_sales, monthly_expenses=monthly_expenses,
-    weekly_sales=weekly_sales, branch_sales=branch_sales,
-    low_stock_products=low_stock_products, recent_sales=recent_sales,
-    top_customers=top_customers, current_branch=current_branch)
+    weekly_sales=weekly_sales, low_stock_products=low_stock_products,
+    recent_sales=recent_sales, top_customers=top_customers)
 
 # ===== إدارة العملاء =====
 
@@ -12926,7 +12797,7 @@ if False:  # IP_BLOCKER_ENABLED:
 print("⚠️ أنظمة الحماية معطلة مؤقتاً لحل مشكلة الحظر")
 print("🔓 يمكنك الآن الوصول للموقع بحرية")
 
-# ===== مسارات اللغات المتعددة والفروع =====
+# ===== مسارات اللغات المتعددة =====
 
 @app.route('/change_language/<language>')
 def change_language(language=None):
@@ -12934,18 +12805,6 @@ def change_language(language=None):
     if language and language in app.config['LANGUAGES']:
         session['language'] = language
         flash(_('تم تغيير اللغة بنجاح') if language == 'ar' else 'Language changed successfully', 'success')
-
-    # العودة للصفحة السابقة أو الرئيسية
-    return redirect(request.referrer or url_for('dashboard'))
-
-@app.route('/change_branch/<branch>')
-def change_branch(branch=None):
-    """تغيير فرع التطبيق"""
-    if branch and branch in app.config['BRANCHES']:
-        session['current_branch'] = branch
-        branch_info = get_branch_info(branch)
-        branch_name = get_branch_display_name(branch)
-        flash(f'تم تغيير الفرع إلى {branch_name} بنجاح' if get_locale() == 'ar' else f'Branch changed to {branch_name} successfully', 'success')
 
     # العودة للصفحة السابقة أو الرئيسية
     return redirect(request.referrer or url_for('dashboard'))
