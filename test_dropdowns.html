@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>اختبار المبدلات</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 50px 0;
+        }
+        
+        .test-container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        .dropdown-toggle {
+            min-width: 150px;
+            margin: 10px;
+        }
+        
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 2px dashed #dee2e6;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="test-container">
+            <h1 class="text-center mb-4">🧪 اختبار مبدلي اللغة والفروع</h1>
+            
+            <!-- اختبار مبدل اللغة -->
+            <div class="test-section">
+                <h3>🌐 مبدل اللغة</h3>
+                <div class="dropdown">
+                    <button class="btn btn-light dropdown-toggle" type="button" id="languageTest" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-globe text-primary me-2"></i>
+                        العربية
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="languageTest">
+                        <li><a class="dropdown-item active" href="#"><i class="fas fa-check text-success me-2"></i>🇸🇦 العربية</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="#"><i class="fas fa-check text-success me-2 invisible"></i>🇺🇸 English</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- اختبار مبدل الفروع -->
+            <div class="test-section">
+                <h3>🏢 مبدل الفروع</h3>
+                <div class="dropdown">
+                    <button class="btn btn-warning dropdown-toggle" type="button" id="branchTest" data-bs-toggle="dropdown" aria-expanded="false">
+                        🇮🇳 Place India
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="branchTest">
+                        <li><a class="dropdown-item active" href="#"><i class="fas fa-check text-success me-2"></i>🇮🇳 Place India</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="#"><i class="fas fa-check text-success me-2 invisible"></i>🏮 China Town</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- اختبار Bootstrap عادي -->
+            <div class="test-section">
+                <h3>⚙️ اختبار Bootstrap عادي</h3>
+                <div class="dropdown">
+                    <button class="btn btn-primary dropdown-toggle" type="button" id="normalTest" data-bs-toggle="dropdown" aria-expanded="false">
+                        اختبار عادي
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="normalTest">
+                        <li><a class="dropdown-item" href="#">خيار 1</a></li>
+                        <li><a class="dropdown-item" href="#">خيار 2</a></li>
+                        <li><a class="dropdown-item" href="#">خيار 3</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- معلومات التشخيص -->
+            <div class="test-section">
+                <h3>🔍 معلومات التشخيص</h3>
+                <div id="diagnostics">
+                    <p><strong>Bootstrap:</strong> <span id="bootstrapStatus">جاري الفحص...</span></p>
+                    <p><strong>jQuery:</strong> <span id="jqueryStatus">جاري الفحص...</span></p>
+                    <p><strong>Font Awesome:</strong> <span id="fontAwesomeStatus">جاري الفحص...</span></p>
+                </div>
+            </div>
+            
+            <!-- أزرار الاختبار -->
+            <div class="test-section text-center">
+                <h3>🎮 أزرار الاختبار</h3>
+                <button class="btn btn-success" onclick="testDropdowns()">اختبار المبدلات</button>
+                <button class="btn btn-info" onclick="showConsole()">عرض Console</button>
+                <button class="btn btn-secondary" onclick="location.reload()">إعادة تحميل</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // فحص المكتبات
+        document.addEventListener('DOMContentLoaded', function() {
+            // فحص Bootstrap
+            if (typeof bootstrap !== 'undefined') {
+                document.getElementById('bootstrapStatus').innerHTML = '✅ محمل';
+                document.getElementById('bootstrapStatus').className = 'text-success';
+            } else {
+                document.getElementById('bootstrapStatus').innerHTML = '❌ غير محمل';
+                document.getElementById('bootstrapStatus').className = 'text-danger';
+            }
+            
+            // فحص Font Awesome
+            const faTest = document.createElement('i');
+            faTest.className = 'fas fa-test';
+            document.body.appendChild(faTest);
+            const faStyles = window.getComputedStyle(faTest);
+            if (faStyles.fontFamily.includes('Font Awesome')) {
+                document.getElementById('fontAwesomeStatus').innerHTML = '✅ محمل';
+                document.getElementById('fontAwesomeStatus').className = 'text-success';
+            } else {
+                document.getElementById('fontAwesomeStatus').innerHTML = '❌ غير محمل';
+                document.getElementById('fontAwesomeStatus').className = 'text-danger';
+            }
+            document.body.removeChild(faTest);
+            
+            console.log('🧪 صفحة الاختبار جاهزة');
+        });
+        
+        function testDropdowns() {
+            console.log('🧪 اختبار المبدلات...');
+            
+            const dropdowns = document.querySelectorAll('.dropdown-toggle');
+            dropdowns.forEach((dropdown, index) => {
+                console.log(`اختبار المبدل ${index + 1}:`, dropdown.id);
+                
+                // محاولة فتح المبدل
+                const bsDropdown = new bootstrap.Dropdown(dropdown);
+                bsDropdown.show();
+                
+                setTimeout(() => {
+                    bsDropdown.hide();
+                }, 2000);
+            });
+        }
+        
+        function showConsole() {
+            alert('افتح Developer Tools (F12) لرؤية رسائل Console');
+        }
+        
+        // تسجيل الأحداث
+        document.addEventListener('click', function(e) {
+            console.log('تم النقر على:', e.target);
+        });
+        
+        // تسجيل أحداث Bootstrap
+        document.addEventListener('show.bs.dropdown', function(e) {
+            console.log('✅ فتح المبدل:', e.target);
+        });
+        
+        document.addEventListener('hide.bs.dropdown', function(e) {
+            console.log('❌ إغلاق المبدل:', e.target);
+        });
+    </script>
+</body>
+</html>

@@ -84,7 +84,7 @@ app.config['DEFAULT_BRANCH'] = 'Place India'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # تهيئة Babel
-babel = Babel(app)
+babel = Babel()
 
 # إعداد قاعدة البيانات مع ضمان الحفظ الدائم
 if os.environ.get('DATABASE_URL'):
@@ -127,8 +127,9 @@ babel.init_app(app, locale_selector=get_locale)
 
 # وظائف مساعدة للترجمة
 def _(text):
-    """وظيفة مختصرة للترجمة"""
-    return gettext(text)
+    """وظيفة مختصرة للترجمة - مبسطة"""
+    # إرجاع النص كما هو مؤقتاً لتجنب أخطاء الترجمة
+    return text
 
 def get_current_language():
     """الحصول على اللغة الحالية"""
@@ -1108,127 +1109,138 @@ def dashboard():
                 to { opacity: 1; transform: translateX(0); }
             }
 
-            /* مبدل اللغة الواضح والبسيط */
-            .language-btn {
+            /* مبدلي اللغة والفروع - واضح وقابل للنقر 100% */
+            .language-btn, .branch-btn {
                 background: white !important;
                 color: #333 !important;
-                border: 2px solid #dee2e6 !important;
+                border: 2px solid #007bff !important;
                 font-weight: 600 !important;
-                transition: all 0.3s ease !important;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
-            }
-
-            .language-btn:hover,
-            .language-btn:focus,
-            .language-btn.show {
-                background: #f8f9fa !important;
-                color: #495057 !important;
-                border-color: #007bff !important;
-                box-shadow: 0 4px 8px rgba(0,123,255,0.2) !important;
-                transform: translateY(-1px) !important;
-            }
-
-            .language-menu {
-                background: white !important;
-                border: 1px solid #dee2e6 !important;
-                border-radius: 8px !important;
-                padding: 8px 0 !important;
-                margin-top: 5px !important;
-                box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
-            }
-
-            .language-option {
-                padding: 10px 16px !important;
-                color: #333 !important;
-                font-weight: 500 !important;
                 transition: all 0.2s ease !important;
-                display: flex !important;
-                align-items: center !important;
-            }
-
-            .language-option:hover {
-                background: #f8f9fa !important;
-                color: #007bff !important;
-                padding-left: 20px !important;
-            }
-
-            .language-option.active {
-                background: #e3f2fd !important;
-                color: #1976d2 !important;
-                font-weight: 600 !important;
-            }
-
-            .language-option .flag-icon {
-                font-size: 18px !important;
-                margin-right: 8px !important;
-            }
-
-            .dropdown-divider {
-                margin: 4px 0 !important;
-                border-color: #dee2e6 !important;
-            }
-
-            /* تحسين الرؤية */
-            .dropdown-menu.show {
-                display: block !important;
+                box-shadow: 0 2px 8px rgba(0,123,255,0.2) !important;
                 opacity: 1 !important;
-                visibility: visible !important;
+                pointer-events: auto !important;
+                filter: none !important;
+                backdrop-filter: none !important;
+                z-index: 1000 !important;
             }
 
-            /* مبدل الفروع */
-            .branch-btn {
-                background: #ffc107 !important;
-                color: #212529 !important;
-                border: 2px solid #ffca2c !important;
-                font-weight: 600 !important;
-                transition: all 0.3s ease !important;
-                box-shadow: 0 2px 4px rgba(255,193,7,0.3) !important;
+            .language-btn:hover, .language-btn:focus, .language-btn.show,
+            .branch-btn:hover, .branch-btn:focus, .branch-btn.show {
+                background: #007bff !important;
+                color: white !important;
+                border-color: #0056b3 !important;
+                box-shadow: 0 4px 12px rgba(0,123,255,0.3) !important;
+                transform: translateY(-2px) !important;
+                opacity: 1 !important;
             }
 
-            .branch-btn:hover,
-            .branch-btn:focus,
-            .branch-btn.show {
-                background: #ffcd39 !important;
-                color: #000 !important;
-                border-color: #ffc720 !important;
-                box-shadow: 0 4px 8px rgba(255,193,7,0.4) !important;
-                transform: translateY(-1px) !important;
-            }
-
-            .branch-menu {
+            .language-menu, .branch-menu {
                 background: white !important;
-                border: 1px solid #dee2e6 !important;
+                border: 2px solid #007bff !important;
                 border-radius: 8px !important;
                 padding: 8px 0 !important;
-                margin-top: 5px !important;
-                box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+                margin-top: 8px !important;
+                box-shadow: 0 8px 25px rgba(0,123,255,0.2) !important;
+                opacity: 1 !important;
+                pointer-events: auto !important;
+                filter: none !important;
+                backdrop-filter: none !important;
+                z-index: 1050 !important;
             }
 
-            .branch-option {
+            .language-option, .branch-option {
                 padding: 12px 16px !important;
                 color: #333 !important;
                 font-weight: 500 !important;
                 transition: all 0.2s ease !important;
                 display: flex !important;
                 align-items: center !important;
+                opacity: 1 !important;
+                pointer-events: auto !important;
+                filter: none !important;
+                text-decoration: none !important;
             }
 
-            .branch-option:hover {
-                background: #fff3cd !important;
-                color: #856404 !important;
+            .language-option:hover, .branch-option:hover {
+                background: #e3f2fd !important;
+                color: #1976d2 !important;
                 padding-left: 20px !important;
+                opacity: 1 !important;
             }
 
-            .branch-option.active {
-                background: #fff3cd !important;
-                color: #856404 !important;
+            .language-option.active, .branch-option.active {
+                background: #1976d2 !important;
+                color: white !important;
                 font-weight: 600 !important;
-                border-left: 4px solid #ffc107 !important;
+                opacity: 1 !important;
             }
 
-            .branch-option .branch-icon {
+            .language-option .flag-icon, .branch-option .branch-icon {
                 font-size: 18px !important;
                 margin-right: 8px !important;
+                opacity: 1 !important;
+            }
+
+            .dropdown-divider {
+                margin: 4px 0 !important;
+                border-color: #dee2e6 !important;
+                opacity: 1 !important;
+            }
+
+            /* تحسين الرؤية والوضوح الكامل */
+            .dropdown-menu.show {
+                display: block !important;
+                opacity: 1 !important;
+                visibility: visible !important;
+                filter: none !important;
+                backdrop-filter: none !important;
+                pointer-events: auto !important;
+            }
+
+            /* إصلاحات إضافية للمبدلات - وضوح كامل */
+            .dropdown-menu {
+                z-index: 1050 !important;
+                border: 2px solid #007bff !important;
+                box-shadow: 0 8px 25px rgba(0,123,255,0.2) !important;
+                opacity: 1 !important;
+                filter: none !important;
+                backdrop-filter: none !important;
+                pointer-events: auto !important;
+            }
+
+            .dropdown-toggle::after {
+                display: inline-block !important;
+                margin-left: 0.255em !important;
+                vertical-align: 0.255em !important;
+                content: "" !important;
+                border-top: 0.3em solid !important;
+                border-right: 0.3em solid transparent !important;
+                border-bottom: 0 !important;
+                border-left: 0.3em solid transparent !important;
+                opacity: 1 !important;
+            }
+
+            .dropdown-toggle:empty::after {
+                margin-left: 0 !important;
+            }
+
+            /* تأكيد عمل Bootstrap - وضوح كامل */
+            .dropdown.show .dropdown-menu {
+                display: block !important;
+                opacity: 1 !important;
+                filter: none !important;
+                backdrop-filter: none !important;
+                pointer-events: auto !important;
+            }
+
+            /* إزالة أي تأثيرات ضبابية من العناصر الأساسية */
+            .navbar-nav .dropdown,
+            .navbar-nav .dropdown-menu,
+            .navbar-nav .dropdown-item {
+                opacity: 1 !important;
+                filter: none !important;
+                backdrop-filter: none !important;
+                pointer-events: auto !important;
             }
         </style>
     </head>
@@ -1820,53 +1832,45 @@ def dashboard():
             }
             });
 
-            // تحسين مبدل اللغة
+            // تهيئة مبدلي اللغة والفروع - Bootstrap فقط
             document.addEventListener('DOMContentLoaded', function() {
-                // التأكد من عمل Bootstrap dropdown
-                const languageDropdown = document.getElementById('languageDropdown');
-                if (languageDropdown) {
-                    console.log('✅ مبدل اللغة موجود');
+                console.log('🚀 تهيئة المبدلات...');
 
-                    // إضافة event listener للنقر
-                    languageDropdown.addEventListener('click', function(e) {
-                        console.log('🖱️ تم النقر على مبدل اللغة');
-                        e.preventDefault();
-
-                        const menu = this.nextElementSibling;
-                        if (menu) {
-                            menu.classList.toggle('show');
-                            this.setAttribute('aria-expanded', menu.classList.contains('show'));
-                        }
-                    });
+                // التأكد من تحميل Bootstrap
+                if (typeof bootstrap === 'undefined') {
+                    console.error('❌ Bootstrap غير محمل!');
+                    return;
                 }
 
-                // إضافة event listeners لخيارات اللغة
+                // السماح لـ Bootstrap بالعمل بشكل طبيعي
+                // لا نحتاج تدخل يدوي
+
+                // فقط إضافة رسائل التحميل
                 const languageOptions = document.querySelectorAll('.language-option');
                 languageOptions.forEach(option => {
                     option.addEventListener('click', function(e) {
-                        console.log('🌐 تم اختيار لغة:', this.textContent.trim());
-
-                        // إظهار رسالة تحميل بسيطة
                         const currentLang = document.getElementById('currentLanguage');
                         if (currentLang) {
-                            currentLang.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>جاري التحميل...';
+                            setTimeout(() => {
+                                currentLang.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Loading...';
+                            }, 100);
                         }
-
-                        // السماح بالانتقال
-                        return true;
                     });
                 });
 
-                // إغلاق القائمة عند النقر خارجها
-                document.addEventListener('click', function(e) {
-                    const dropdown = document.querySelector('.language-menu');
-                    const button = document.getElementById('languageDropdown');
-
-                    if (dropdown && button && !button.contains(e.target) && !dropdown.contains(e.target)) {
-                        dropdown.classList.remove('show');
-                        button.setAttribute('aria-expanded', 'false');
-                    }
+                const branchOptions = document.querySelectorAll('.branch-option');
+                branchOptions.forEach(option => {
+                    option.addEventListener('click', function(e) {
+                        const currentBranch = document.getElementById('currentBranch');
+                        if (currentBranch) {
+                            setTimeout(() => {
+                                currentBranch.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Loading...';
+                            }, 100);
+                        }
+                    });
                 });
+
+                console.log('✅ تم تهيئة المبدلات');
             });
 
             // تأثير الموجة للأزرار
