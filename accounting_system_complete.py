@@ -26,7 +26,28 @@ from decimal import Decimal
 from flask import Flask, render_template_string, request, redirect, url_for, flash, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from flask_babel import Babel, gettext, ngettext, lazy_gettext, get_locale
+# استيراد flask-babel مع معالجة الأخطاء
+try:
+    from flask_babel import Babel, gettext, ngettext, lazy_gettext, get_locale
+    BABEL_AVAILABLE = True
+except ImportError:
+    print("⚠️ flask-babel غير متاح - سيتم تشغيل النظام بدون ترجمة")
+    BABEL_AVAILABLE = False
+
+    # وظائف بديلة
+    class DummyBabel:
+        def init_app(self, app, locale_selector=None):
+            pass
+
+    def gettext(text):
+        return text
+
+    def get_locale():
+        return 'ar'
+
+    Babel = DummyBabel
+    ngettext = gettext
+    lazy_gettext = gettext
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # استيراد نظام الحماية المتقدم
@@ -83,8 +104,11 @@ app.config['DEFAULT_BRANCH'] = 'Place India'
 # إنشاء مجلد الرفع إذا لم يكن موجوداً
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# تهيئة Babel
-babel = Babel()
+# تهيئة Babel مع معالجة الأخطاء
+if BABEL_AVAILABLE:
+    babel = Babel()
+else:
+    babel = DummyBabel()
 
 # إعداد قاعدة البيانات مع ضمان الحفظ الدائم
 if os.environ.get('DATABASE_URL'):
@@ -120,10 +144,22 @@ def get_locale():
         return session['language']
 
     # التحقق من اللغة المفضلة في المتصفح
-    return request.accept_languages.best_match(app.config['LANGUAGES'].keys()) or app.config['BABEL_DEFAULT_LOCALE']
+    if BABEL_AVAILABLE:
+        return request.accept_languages.best_match(app.config['LANGUAGES'].keys()) or app.config['BABEL_DEFAULT_LOCALE']
+    else:
+        return 'ar'  # افتراضي
 
-# تسجيل وظيفة اختيار اللغة مع Babel
-babel.init_app(app, locale_selector=get_locale)
+# تسجيل وظيفة اختيار اللغة مع Babel - مع معالجة الأخطاء
+try:
+    if BABEL_AVAILABLE:
+        babel.init_app(app, locale_selector=get_locale)
+        print("✅ تم تهيئة Babel بنجاح")
+    else:
+        print("⚠️ تم تخطي تهيئة Babel - غير متاح")
+except Exception as e:
+    print(f"⚠️ خطأ في تهيئة Babel: {e}")
+    # تعطيل Babel في حالة الخطأ
+    BABEL_AVAILABLE = False
 
 # وظائف مساعدة للترجمة
 def _(text):
@@ -1302,7 +1338,7 @@ def dashboard():
                         <i class="fas fa-user me-1"></i>{{ current_user.full_name }}
                     </span>
                     <a class="nav-link" href="{{ url_for('logout') }}">
-                        <i class="fas fa-sign-out-alt"></i> {{ _('خروج') if get_locale() == 'ar' else 'Logout' }}
+                        <i class="fas fa-sign-out-alt"></i> {% if get_locale() == 'ar' %}خروج{% else %}Logout{% endif %}
                     </a>
                 </div>
             </div>
@@ -12937,7 +12973,7 @@ def change_language(language=None):
     """تغيير لغة التطبيق"""
     if language and language in app.config['LANGUAGES']:
         session['language'] = language
-        flash(_('تم تغيير اللغة بنجاح') if language == 'ar' else 'Language changed successfully', 'success')
+        flash('تم تغيير اللغة بنجاح' if language == 'ar' else 'Language changed successfully', 'success')
 
     # العودة للصفحة السابقة أو الرئيسية
     return redirect(request.referrer or url_for('dashboard'))
