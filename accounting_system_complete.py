@@ -1057,63 +1057,71 @@ def dashboard():
                 to { opacity: 1; transform: translateX(0); }
             }
 
-            /* تحسينات مبدل اللغة */
-            .language-dropdown .dropdown-toggle {
-                background: rgba(255,255,255,0.1);
-                border: 2px solid rgba(255,255,255,0.3);
-                color: white;
-                transition: all 0.3s ease;
-                border-radius: 25px;
-                padding: 8px 16px;
-                font-weight: 500;
+            /* مبدل اللغة الواضح والبسيط */
+            .language-btn {
+                background: white !important;
+                color: #333 !important;
+                border: 2px solid #dee2e6 !important;
+                font-weight: 600 !important;
+                transition: all 0.3s ease !important;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
             }
 
-            .language-dropdown .dropdown-toggle:hover,
-            .language-dropdown .dropdown-toggle:focus {
-                background: rgba(255,255,255,0.2);
-                border-color: rgba(255,255,255,0.8);
-                box-shadow: 0 0 15px rgba(255,255,255,0.3);
-                transform: translateY(-2px);
+            .language-btn:hover,
+            .language-btn:focus,
+            .language-btn.show {
+                background: #f8f9fa !important;
+                color: #495057 !important;
+                border-color: #007bff !important;
+                box-shadow: 0 4px 8px rgba(0,123,255,0.2) !important;
+                transform: translateY(-1px) !important;
             }
 
-            .language-dropdown .dropdown-menu {
-                background: rgba(255,255,255,0.95);
-                backdrop-filter: blur(10px);
-                border: none;
-                box-shadow: 0 15px 35px rgba(0,0,0,0.15);
-                border-radius: 15px;
-                padding: 10px 0;
-                min-width: 180px;
-                margin-top: 10px;
+            .language-menu {
+                background: white !important;
+                border: 1px solid #dee2e6 !important;
+                border-radius: 8px !important;
+                padding: 8px 0 !important;
+                margin-top: 5px !important;
+                box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
             }
 
-            .language-dropdown .dropdown-item {
-                padding: 12px 20px;
-                transition: all 0.3s ease;
-                border-radius: 10px;
-                margin: 2px 10px;
-                font-weight: 500;
+            .language-option {
+                padding: 10px 16px !important;
+                color: #333 !important;
+                font-weight: 500 !important;
+                transition: all 0.2s ease !important;
+                display: flex !important;
+                align-items: center !important;
             }
 
-            .language-dropdown .dropdown-item:hover {
-                background: var(--primary-gradient);
-                color: white;
-                transform: translateX(5px);
+            .language-option:hover {
+                background: #f8f9fa !important;
+                color: #007bff !important;
+                padding-left: 20px !important;
             }
 
-            .language-dropdown .dropdown-item.active {
-                background: var(--primary-gradient);
-                color: white;
-                font-weight: 600;
+            .language-option.active {
+                background: #e3f2fd !important;
+                color: #1976d2 !important;
+                font-weight: 600 !important;
             }
 
-            .language-dropdown .dropdown-item i.fa-flag {
-                color: #ffd700;
+            .language-option .flag-icon {
+                font-size: 18px !important;
+                margin-right: 8px !important;
             }
 
-            .language-dropdown .dropdown-divider {
-                margin: 8px 15px;
-                border-color: rgba(0,0,0,0.1);
+            .dropdown-divider {
+                margin: 4px 0 !important;
+                border-color: #dee2e6 !important;
+            }
+
+            /* تحسين الرؤية */
+            .dropdown-menu.show {
+                display: block !important;
+                opacity: 1 !important;
+                visibility: visible !important;
             }
         </style>
     </head>
@@ -1125,24 +1133,26 @@ def dashboard():
                     <span>{% if get_locale() == 'ar' %}نظام المحاسبة الاحترافي{% else %}Professional Accounting System{% endif %}</span>
                 </a>
                 <div class="navbar-nav ms-auto">
-                    <!-- مبدل اللغة المحسن -->
-                    <div class="dropdown language-dropdown me-3">
-                        <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button" id="languageDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-globe me-1"></i>
+                    <!-- مبدل اللغة الواضح -->
+                    <div class="dropdown me-3">
+                        <button class="btn btn-light btn-sm dropdown-toggle language-btn" type="button" id="languageDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="min-width: 120px;">
+                            <i class="fas fa-globe text-primary me-2"></i>
                             <span id="currentLanguage">{% if get_locale() == 'ar' %}العربية{% else %}English{% endif %}</span>
                         </button>
-                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="languageDropdown">
+                        <ul class="dropdown-menu language-menu shadow" aria-labelledby="languageDropdown" style="min-width: 150px;">
                             <li>
-                                <a class="dropdown-item {% if get_locale() == 'ar' %}active{% endif %}" href="{{ url_for('change_language', language='ar') }}" onclick="changeLanguage('ar')">
-                                    <i class="fas fa-check me-2 {% if get_locale() != 'ar' %}invisible{% endif %}"></i>
-                                    <i class="fas fa-flag me-2"></i>العربية
+                                <a class="dropdown-item language-option {% if get_locale() == 'ar' %}active{% endif %}" href="{{ url_for('change_language', language='ar') }}">
+                                    <i class="fas fa-check text-success me-2 {% if get_locale() != 'ar' %}invisible{% endif %}"></i>
+                                    <span class="flag-icon">🇸🇦</span>
+                                    <span class="ms-2">العربية</span>
                                 </a>
                             </li>
-                            <li><hr class="dropdown-divider"></li>
+                            <li><hr class="dropdown-divider my-1"></li>
                             <li>
-                                <a class="dropdown-item {% if get_locale() == 'en' %}active{% endif %}" href="{{ url_for('change_language', language='en') }}" onclick="changeLanguage('en')">
-                                    <i class="fas fa-check me-2 {% if get_locale() != 'en' %}invisible{% endif %}"></i>
-                                    <i class="fas fa-flag me-2"></i>English
+                                <a class="dropdown-item language-option {% if get_locale() == 'en' %}active{% endif %}" href="{{ url_for('change_language', language='en') }}">
+                                    <i class="fas fa-check text-success me-2 {% if get_locale() != 'en' %}invisible{% endif %}"></i>
+                                    <span class="flag-icon">🇺🇸</span>
+                                    <span class="ms-2">English</span>
                                 </a>
                             </li>
                         </ul>
@@ -1682,64 +1692,52 @@ def dashboard():
             }
             });
 
-            // وظيفة تغيير اللغة
-            function changeLanguage(lang) {
-                // تحديث النص في الزر
-                const currentLangSpan = document.getElementById('currentLanguage');
-                if (currentLangSpan) {
-                    currentLangSpan.textContent = lang === 'ar' ? 'العربية' : 'English';
-                }
-
-                // إظهار رسالة تحميل
-                const loadingToast = document.createElement('div');
-                loadingToast.className = 'toast-container position-fixed top-0 end-0 p-3';
-                loadingToast.innerHTML = `
-                    <div class="toast show" role="alert">
-                        <div class="toast-header">
-                            <i class="fas fa-globe text-primary me-2"></i>
-                            <strong class="me-auto">${lang === 'ar' ? 'تغيير اللغة' : 'Language Change'}</strong>
-                        </div>
-                        <div class="toast-body">
-                            ${lang === 'ar' ? 'جاري تحميل اللغة العربية...' : 'Loading English language...'}
-                        </div>
-                    </div>
-                `;
-                document.body.appendChild(loadingToast);
-
-                // إزالة الرسالة بعد ثانيتين
-                setTimeout(() => {
-                    loadingToast.remove();
-                }, 2000);
-
-                return true; // السماح بالانتقال
-            }
-
-            // تحسين dropdown للغات
+            // تحسين مبدل اللغة
             document.addEventListener('DOMContentLoaded', function() {
+                // التأكد من عمل Bootstrap dropdown
                 const languageDropdown = document.getElementById('languageDropdown');
                 if (languageDropdown) {
-                    // إضافة تأثير hover
-                    languageDropdown.addEventListener('mouseenter', function() {
-                        this.style.transform = 'scale(1.05)';
-                    });
+                    console.log('✅ مبدل اللغة موجود');
 
-                    languageDropdown.addEventListener('mouseleave', function() {
-                        this.style.transform = 'scale(1)';
+                    // إضافة event listener للنقر
+                    languageDropdown.addEventListener('click', function(e) {
+                        console.log('🖱️ تم النقر على مبدل اللغة');
+                        e.preventDefault();
+
+                        const menu = this.nextElementSibling;
+                        if (menu) {
+                            menu.classList.toggle('show');
+                            this.setAttribute('aria-expanded', menu.classList.contains('show'));
+                        }
                     });
                 }
 
-                // تحسين عناصر القائمة
-                const dropdownItems = document.querySelectorAll('.dropdown-item');
-                dropdownItems.forEach(item => {
-                    item.addEventListener('mouseenter', function() {
-                        this.style.backgroundColor = '#f8f9fa';
-                        this.style.transform = 'translateX(5px)';
-                    });
+                // إضافة event listeners لخيارات اللغة
+                const languageOptions = document.querySelectorAll('.language-option');
+                languageOptions.forEach(option => {
+                    option.addEventListener('click', function(e) {
+                        console.log('🌐 تم اختيار لغة:', this.textContent.trim());
 
-                    item.addEventListener('mouseleave', function() {
-                        this.style.backgroundColor = '';
-                        this.style.transform = 'translateX(0)';
+                        // إظهار رسالة تحميل بسيطة
+                        const currentLang = document.getElementById('currentLanguage');
+                        if (currentLang) {
+                            currentLang.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>جاري التحميل...';
+                        }
+
+                        // السماح بالانتقال
+                        return true;
                     });
+                });
+
+                // إغلاق القائمة عند النقر خارجها
+                document.addEventListener('click', function(e) {
+                    const dropdown = document.querySelector('.language-menu');
+                    const button = document.getElementById('languageDropdown');
+
+                    if (dropdown && button && !button.contains(e.target) && !dropdown.contains(e.target)) {
+                        dropdown.classList.remove('show');
+                        button.setAttribute('aria-expanded', 'false');
+                    }
                 });
             });
 
