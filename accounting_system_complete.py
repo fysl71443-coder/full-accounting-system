@@ -26,6 +26,15 @@ from decimal import Decimal
 from flask import Flask, render_template_string, request, redirect, url_for, flash, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+
+# إضافة دعم WebSocket للتحديث الفوري
+try:
+    from flask_socketio import SocketIO, emit, join_room, leave_room
+    SOCKETIO_AVAILABLE = True
+    print("✅ Flask-SocketIO متاح - سيتم تفعيل التحديث الفوري")
+except ImportError:
+    SOCKETIO_AVAILABLE = False
+    print("⚠️ Flask-SocketIO غير متاح - سيعمل النظام بدون تحديث فوري")
 # استيراد flask-babel مع معالجة الأخطاء
 try:
     from flask_babel import Babel, gettext, ngettext, lazy_gettext, get_locale
@@ -75,6 +84,14 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'accounting-system-complete-2024')
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+
+# تهيئة SocketIO للتحديث الفوري
+if SOCKETIO_AVAILABLE:
+    socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+    print("✅ تم تهيئة SocketIO للتحديث الفوري")
+else:
+    socketio = None
+    print("⚠️ SocketIO غير متاح - لن يكون هناك تحديث فوري")
 
 # إعدادات اللغات المتعددة
 app.config['LANGUAGES'] = {
@@ -128,6 +145,20 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,
     'pool_recycle': 300,
 }
+
+# إعداد قاعدة البيانات مع دعم PostgreSQL
+database_url = os.environ.get('DATABASE_URL')
+if database_url:
+    # تحويل postgres:// إلى postgresql:// للتوافق مع SQLAlchemy الحديث
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    print(f"🐘 استخدام PostgreSQL: {database_url.split('@')[1] if '@' in database_url else 'مخفي'}")
+else:
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///instance/accounting_complete.db'
+    print("📁 استخدام SQLite المحلي")
+
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # قاعدة البيانات
 db = SQLAlchemy(app)
@@ -290,6 +321,61 @@ def get_branch_display_name(branch_name):
     current_lang = get_locale()
     return branch_info.get(f'name_{current_lang}', branch_name)
 
+# إضافة JavaScript للتحديث الفوري في القوالب
+SOCKETIO_JS = '''
+<script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+<script>
+    const socket = io();
+
+    socket.on('connect', function() {
+        console.log('🔗 متصل بالخادم');
+        socket.emit('join_room', {room: 'general'});
+    });
+
+    socket.on('disconnect', function() {
+        console.log('❌ انقطع الاتصال');
+    });
+
+    socket.on('data_update', function(data) {
+        console.log('📡 تحديث فوري:', data);
+
+        // إظهار إشعار للمستخدم
+        if (data.type === 'sales_invoice') {
+            showNotification('تم إضافة فاتورة مبيعات جديدة', 'success');
+        } else if (data.type === 'customer') {
+            showNotification('تم تحديث بيانات العملاء', 'info');
+        } else if (data.type === 'product') {
+            showNotification('تم تحديث المنتجات', 'info');
+        }
+
+        // إعادة تحميل الصفحة أو تحديث البيانات
+        setTimeout(() => {
+            location.reload();
+        }, 2000);
+    });
+
+    function showNotification(message, type = 'info') {
+        // إنشاء إشعار بسيط
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+        notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        notification.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+
+        document.body.appendChild(notification);
+
+        // إزالة الإشعار بعد 5 ثوان
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 5000);
+    }
+</script>
+''' if SOCKETIO_AVAILABLE else ''
+
 # تسجيل الدوال المساعدة مع Jinja2
 app.jinja_env.globals.update(
     format_date=format_date,
@@ -303,7 +389,8 @@ app.jinja_env.globals.update(
     get_current_branch=get_current_branch,  # الحصول على الفرع الحالي
     get_available_branches=get_available_branches,  # الفروع المتاحة
     get_branch_info=get_branch_info,  # معلومات الفرع
-    get_branch_display_name=get_branch_display_name  # اسم الفرع للعرض
+    get_branch_display_name=get_branch_display_name,  # اسم الفرع للعرض
+    SOCKETIO_JS=SOCKETIO_JS  # JavaScript للتحديث الفوري
 )
 
 @login_manager.user_loader
@@ -1903,6 +1990,7 @@ def dashboard():
         </div>
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        {{ SOCKETIO_JS|safe }}
         <script>
             // تحديث الوقت الحالي
             function updateCurrentTime() {
@@ -2536,6 +2624,14 @@ def add_customer():
         )
         db.session.add(customer)
         db.session.commit()
+
+        # إرسال تحديث فوري لجميع المستخدمين
+        broadcast_update('customer', {
+            'action': 'created',
+            'name': customer.name,
+            'email': customer.email,
+            'phone': customer.phone
+        })
 
         # التأكد من الحفظ
         saved_customer = Customer.query.filter_by(name=request.form['name']).first()
@@ -3951,6 +4047,19 @@ def add_sale():
                 db.session.add(item)
 
         db.session.commit()
+
+        # الحصول على بيانات العميل للتحديث الفوري
+        customer = Customer.query.get(sale.customer_id) if sale.customer_id else None
+
+        # إرسال تحديث فوري لجميع المستخدمين
+        broadcast_update('sales_invoice', {
+            'action': 'created',
+            'invoice_number': sale.invoice_number,
+            'customer': customer.name if customer else 'عميل نقدي',
+            'total': float(sale.total),
+            'branch': sale.branch
+        })
+
         flash('تم إنشاء فاتورة المبيعات بنجاح', 'success')
         return redirect(url_for('sales'))
 
@@ -12713,9 +12822,15 @@ if __name__ == '__main__':
     print('👤 المستخدم: admin | كلمة المرور: admin123')
     print('🔍 فحص البيانات: http://localhost:5000/check_data_status')
 
-    # تشغيل التطبيق
+    # تشغيل الخادم مع دعم SocketIO
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+
+    if SOCKETIO_AVAILABLE and socketio:
+        print('🔄 تشغيل الخادم مع دعم التحديث الفوري (SocketIO)')
+        socketio.run(app, host='0.0.0.0', port=port, debug=False)
+    else:
+        print('📡 تشغيل الخادم العادي (بدون تحديث فوري)')
+        app.run(host='0.0.0.0', port=port, debug=False)
 
 # تقرير المدفوعات التفصيلي
 @app.route('/payments_report')
@@ -13120,6 +13235,45 @@ if False:  # IP_BLOCKER_ENABLED:
 
 print("⚠️ أنظمة الحماية معطلة مؤقتاً لحل مشكلة الحظر")
 print("🔓 يمكنك الآن الوصول للموقع بحرية")
+
+# ===== وظائف WebSocket للتحديث الفوري =====
+
+if SOCKETIO_AVAILABLE:
+    @socketio.on('connect')
+    def handle_connect():
+        """عند اتصال مستخدم جديد"""
+        print(f'🔗 مستخدم متصل: {request.sid}')
+        emit('status', {'msg': 'متصل بنجاح'})
+
+    @socketio.on('disconnect')
+    def handle_disconnect():
+        """عند قطع الاتصال"""
+        print(f'❌ مستخدم منقطع: {request.sid}')
+
+    @socketio.on('join_room')
+    def handle_join_room(data):
+        """انضمام لغرفة معينة (مثل فرع معين)"""
+        room = data.get('room', 'general')
+        join_room(room)
+        emit('status', {'msg': f'انضممت لغرفة {room}'})
+
+    @socketio.on('leave_room')
+    def handle_leave_room(data):
+        """مغادرة غرفة"""
+        room = data.get('room', 'general')
+        leave_room(room)
+        emit('status', {'msg': f'غادرت غرفة {room}'})
+
+def broadcast_update(event_type, data, room='general'):
+    """إرسال تحديث لجميع المستخدمين المتصلين"""
+    if SOCKETIO_AVAILABLE and socketio:
+        socketio.emit('data_update', {
+            'type': event_type,
+            'data': data,
+            'timestamp': datetime.now().isoformat()
+        }, room=room)
+
+# تم نقل تعريف SOCKETIO_JS إلى أعلى الملف
 
 # ===== مسارات اللغات المتعددة والفروع =====
 

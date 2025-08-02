@@ -17,6 +17,13 @@ Werkzeug>=2.3.0,<3.0.0
 # Production server
 gunicorn==21.2.0
 
+# Real-time communication
+Flask-SocketIO==5.3.6
+eventlet==0.33.3
+
+# PostgreSQL database
+psycopg2-binary==2.9.7
+
 # Additional dependencies that might be needed
 itsdangerous==2.1.2
 Jinja2==3.1.2
