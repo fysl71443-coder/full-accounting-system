@@ -137,17 +137,29 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# وظائف Babel للغات المتعددة
+# وظائف Babel للغات المتعددة - محسنة
 def get_locale():
-    # التحقق من اللغة المحددة في الجلسة
-    if 'language' in session:
-        return session['language']
+    """الحصول على اللغة الحالية من الجلسة أو الافتراضية"""
+    try:
+        # التحقق من اللغة المحددة في الجلسة أولاً
+        if 'language' in session:
+            selected_lang = session['language']
+            # التأكد من أن اللغة مدعومة
+            if selected_lang in app.config['LANGUAGES']:
+                return selected_lang
 
-    # التحقق من اللغة المفضلة في المتصفح
-    if BABEL_AVAILABLE:
-        return request.accept_languages.best_match(app.config['LANGUAGES'].keys()) or app.config['BABEL_DEFAULT_LOCALE']
-    else:
-        return 'ar'  # افتراضي
+        # التحقق من اللغة المفضلة في المتصفح
+        if BABEL_AVAILABLE and hasattr(request, 'accept_languages'):
+            browser_lang = request.accept_languages.best_match(app.config['LANGUAGES'].keys())
+            if browser_lang:
+                return browser_lang
+
+        # الافتراضي
+        return app.config.get('BABEL_DEFAULT_LOCALE', 'ar')
+
+    except Exception as e:
+        # في حالة الخطأ، إرجاع الافتراضي
+        return 'ar'
 
 # تسجيل وظيفة اختيار اللغة مع Babel - مع معالجة الأخطاء
 try:
@@ -161,11 +173,95 @@ except Exception as e:
     # تعطيل Babel في حالة الخطأ
     BABEL_AVAILABLE = False
 
-# وظائف مساعدة للترجمة
+# نظام ترجمة بسيط ومباشر
+TRANSLATIONS = {
+    'ar': {
+        'Dashboard': 'لوحة التحكم',
+        'Professional Accounting System': 'نظام المحاسبة الاحترافي',
+        'Welcome': 'مرحباً',
+        'Last login': 'آخر تسجيل دخول',
+        'Logout': 'خروج',
+        'Company Logo': 'شعار الشركة',
+        'Dashboard - Accounting System': 'لوحة التحكم - نظام المحاسبة',
+        'Welcome to the Professional Accounting System': 'مرحباً بك في نظام المحاسبة الاحترافي',
+        'Sales': 'المبيعات',
+        'Purchases': 'المشتريات',
+        'Customers': 'العملاء',
+        'Suppliers': 'الموردين',
+        'Products': 'المنتجات',
+        'Employees': 'الموظفين',
+        'Reports': 'التقارير',
+        'Settings': 'الإعدادات',
+        'Users Management': 'إدارة المستخدمين',
+        'Total Sales': 'إجمالي المبيعات',
+        'Total Purchases': 'إجمالي المشتريات',
+        'Net Profit': 'صافي الربح',
+        'Monthly Sales': 'مبيعات الشهر',
+        'Statistics': 'الإحصائيات',
+        'Quick Actions': 'الإجراءات السريعة',
+        'Recent Activities': 'الأنشطة الحديثة',
+        'System Overview': 'نظرة عامة على النظام',
+        'Financial Summary': 'الملخص المالي',
+        'Branch': 'الفرع',
+        'Language': 'اللغة',
+        'Arabic': 'العربية',
+        'English': 'الإنجليزية'
+    },
+    'en': {
+        'لوحة التحكم': 'Dashboard',
+        'نظام المحاسبة الاحترافي': 'Professional Accounting System',
+        'مرحباً': 'Welcome',
+        'آخر تسجيل دخول': 'Last login',
+        'خروج': 'Logout',
+        'شعار الشركة': 'Company Logo',
+        'لوحة التحكم - نظام المحاسبة': 'Dashboard - Accounting System',
+        'مرحباً بك في نظام المحاسبة الاحترافي': 'Welcome to the Professional Accounting System',
+        'المبيعات': 'Sales',
+        'المشتريات': 'Purchases',
+        'العملاء': 'Customers',
+        'الموردين': 'Suppliers',
+        'المنتجات': 'Products',
+        'الموظفين': 'Employees',
+        'التقارير': 'Reports',
+        'الإعدادات': 'Settings',
+        'إدارة المستخدمين': 'Users Management',
+        'إجمالي المبيعات': 'Total Sales',
+        'إجمالي المشتريات': 'Total Purchases',
+        'صافي الربح': 'Net Profit',
+        'مبيعات الشهر': 'Monthly Sales',
+        'الإحصائيات': 'Statistics',
+        'الإجراءات السريعة': 'Quick Actions',
+        'الأنشطة الحديثة': 'Recent Activities',
+        'نظرة عامة على النظام': 'System Overview',
+        'الملخص المالي': 'Financial Summary',
+        'الفرع': 'Branch',
+        'اللغة': 'Language',
+        'العربية': 'Arabic',
+        'الإنجليزية': 'English'
+    }
+}
+
 def _(text):
-    """وظيفة مختصرة للترجمة - مبسطة"""
-    # إرجاع النص كما هو مؤقتاً لتجنب أخطاء الترجمة
-    return text
+    """وظيفة ترجمة بسيطة ومباشرة"""
+    try:
+        current_lang = get_locale()
+        if current_lang in TRANSLATIONS and text in TRANSLATIONS[current_lang]:
+            return TRANSLATIONS[current_lang][text]
+        return text
+    except:
+        return text
+
+def translate_text(text, target_lang=None):
+    """ترجمة نص إلى لغة محددة"""
+    try:
+        if target_lang is None:
+            target_lang = get_locale()
+
+        if target_lang in TRANSLATIONS and text in TRANSLATIONS[target_lang]:
+            return TRANSLATIONS[target_lang][text]
+        return text
+    except:
+        return text
 
 def get_current_language():
     """الحصول على اللغة الحالية"""
@@ -200,7 +296,8 @@ app.jinja_env.globals.update(
     format_datetime=format_datetime,
     zfill_number=zfill_number,
     now=datetime.now,
-    _=gettext,  # وظيفة الترجمة
+    _=_,  # وظيفة الترجمة المحسنة
+    translate_text=translate_text,  # وظيفة الترجمة المباشرة
     get_locale=get_locale,  # الحصول على اللغة الحالية
     get_available_languages=get_available_languages,  # اللغات المتاحة
     get_current_branch=get_current_branch,  # الحصول على الفرع الحالي
