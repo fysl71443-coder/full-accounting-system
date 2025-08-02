@@ -26,6 +26,7 @@ from decimal import Decimal
 from flask import Flask, render_template_string, request, redirect, url_for, flash, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_babel import Babel, gettext, ngettext, lazy_gettext, get_locale
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # استيراد نظام الحماية المتقدم
@@ -54,8 +55,19 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'accounting-system-compl
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
+# إعدادات اللغات المتعددة
+app.config['LANGUAGES'] = {
+    'ar': 'العربية',
+    'en': 'English'
+}
+app.config['BABEL_DEFAULT_LOCALE'] = 'ar'
+app.config['BABEL_DEFAULT_TIMEZONE'] = 'UTC'
+
 # إنشاء مجلد الرفع إذا لم يكن موجوداً
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# تهيئة Babel
+babel = Babel(app)
 
 # إعداد قاعدة البيانات مع ضمان الحفظ الدائم
 if os.environ.get('DATABASE_URL'):
@@ -84,12 +96,40 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+# وظائف Babel للغات المتعددة
+def get_locale():
+    # التحقق من اللغة المحددة في الجلسة
+    if 'language' in session:
+        return session['language']
+
+    # التحقق من اللغة المفضلة في المتصفح
+    return request.accept_languages.best_match(app.config['LANGUAGES'].keys()) or app.config['BABEL_DEFAULT_LOCALE']
+
+# تسجيل وظيفة اختيار اللغة مع Babel
+babel.init_app(app, locale_selector=get_locale)
+
+# وظائف مساعدة للترجمة
+def _(text):
+    """وظيفة مختصرة للترجمة"""
+    return gettext(text)
+
+def get_current_language():
+    """الحصول على اللغة الحالية"""
+    return get_locale()
+
+def get_available_languages():
+    """الحصول على اللغات المتاحة"""
+    return app.config['LANGUAGES']
+
 # تسجيل الدوال المساعدة مع Jinja2
 app.jinja_env.globals.update(
     format_date=format_date,
     format_datetime=format_datetime,
     zfill_number=zfill_number,
-    now=datetime.now
+    now=datetime.now,
+    _=gettext,  # وظيفة الترجمة
+    get_locale=get_locale,  # الحصول على اللغة الحالية
+    get_available_languages=get_available_languages  # اللغات المتاحة
 )
 
 @login_manager.user_loader
@@ -782,12 +822,12 @@ def dashboard():
 
     return render_template_string('''
     <!DOCTYPE html>
-    <html dir="rtl" lang="ar">
+    <html dir="{% if get_locale() == 'ar' %}rtl{% else %}ltr{% endif %}" lang="{{ get_locale() }}">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>لوحة التحكم - نظام المحاسبة</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <title>{% if get_locale() == 'ar' %}لوحة التحكم - نظام المحاسبة{% else %}Dashboard - Accounting System{% endif %}</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap{% if get_locale() == 'ar' %}.rtl{% endif %}.min.css" rel="stylesheet">
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
         <style>
             :root {
@@ -1022,15 +1062,35 @@ def dashboard():
         <nav class="navbar navbar-expand-lg navbar-dark">
             <div class="container">
                 <a class="navbar-brand d-flex align-items-center" href="{{ url_for('dashboard') }}">
-                    <img src="{{ get_company_logo() }}" alt="شعار الشركة" style="height: 40px; margin-left: 10px;" class="company-logo">
-                    <span>نظام المحاسبة الاحترافي</span>
+                    <img src="{{ get_company_logo() }}" alt="{% if get_locale() == 'ar' %}شعار الشركة{% else %}Company Logo{% endif %}" style="height: 40px; margin-{% if get_locale() == 'ar' %}left{% else %}right{% endif %}: 10px;" class="company-logo">
+                    <span>{% if get_locale() == 'ar' %}نظام المحاسبة الاحترافي{% else %}Professional Accounting System{% endif %}</span>
                 </a>
                 <div class="navbar-nav ms-auto">
+                    <!-- مبدل اللغة -->
+                    <div class="dropdown me-3">
+                        <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-globe me-1"></i>
+                            {% if get_locale() == 'ar' %}العربية{% else %}English{% endif %}
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <a class="dropdown-item {% if get_locale() == 'ar' %}active{% endif %}" href="{{ url_for('change_language', language='ar') }}">
+                                    <i class="fas fa-check me-2 {% if get_locale() != 'ar' %}invisible{% endif %}"></i>العربية
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item {% if get_locale() == 'en' %}active{% endif %}" href="{{ url_for('change_language', language='en') }}">
+                                    <i class="fas fa-check me-2 {% if get_locale() != 'en' %}invisible{% endif %}"></i>English
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+
                     <span class="navbar-text me-3">
                         <i class="fas fa-user me-1"></i>{{ current_user.full_name }}
                     </span>
                     <a class="nav-link" href="{{ url_for('logout') }}">
-                        <i class="fas fa-sign-out-alt"></i> خروج
+                        <i class="fas fa-sign-out-alt"></i> {{ _('خروج') if get_locale() == 'ar' else 'Logout' }}
                     </a>
                 </div>
             </div>
@@ -1046,11 +1106,11 @@ def dashboard():
                                 <i class="fas fa-chart-line"></i>
                             </div>
                             <div>
-                                <h4 class="mb-2">مرحباً {{ current_user.full_name }} 👋</h4>
-                                <p class="mb-1">مرحباً بك في نظام المحاسبة الاحترافي</p>
+                                <h4 class="mb-2">{% if get_locale() == 'ar' %}مرحباً {{ current_user.full_name }} 👋{% else %}Welcome {{ current_user.full_name }} 👋{% endif %}</h4>
+                                <p class="mb-1">{% if get_locale() == 'ar' %}مرحباً بك في نظام المحاسبة الاحترافي{% else %}Welcome to the Professional Accounting System{% endif %}</p>
                                 <small class="text-muted">
                                     <i class="fas fa-clock me-1"></i>
-                                    آخر تسجيل دخول: <span id="currentTime"></span>
+                                    {% if get_locale() == 'ar' %}آخر تسجيل دخول:{% else %}Last login:{% endif %} <span id="currentTime"></span>
                                 </small>
                             </div>
                             <div class="ms-auto">
@@ -1516,6 +1576,48 @@ def dashboard():
                     // يمكن إضافة AJAX لتحديث الإحصائيات هنا
                     console.log('تحديث الإحصائيات...');
                 }, 300000); // كل 5 دقائق
+
+                // تحميل الترجمات الديناميكية
+                loadTranslations();
+            });
+
+            // وظائف الترجمة الديناميكية
+            let currentTranslations = {};
+
+            async function loadTranslations() {
+                try {
+                    const response = await fetch('/get_translations');
+                    currentTranslations = await response.json();
+                    console.log('تم تحميل الترجمات:', currentTranslations);
+                } catch (error) {
+                    console.error('خطأ في تحميل الترجمات:', error);
+                }
+            }
+
+            function _(key) {
+                return currentTranslations[key] || key;
+            }
+
+            // تحديث النصوص عند تغيير اللغة
+            function updatePageTexts() {
+                // تحديث العناوين
+                const titleElements = document.querySelectorAll('[data-translate]');
+                titleElements.forEach(element => {
+                    const key = element.getAttribute('data-translate');
+                    if (currentTranslations[key]) {
+                        element.textContent = currentTranslations[key];
+                    }
+                });
+
+                // تحديث placeholders
+                const inputElements = document.querySelectorAll('[data-translate-placeholder]');
+                inputElements.forEach(element => {
+                    const key = element.getAttribute('data-translate-placeholder');
+                    if (currentTranslations[key]) {
+                        element.placeholder = currentTranslations[key];
+                    }
+                });
+            }
             });
 
             // تأثير الموجة للأزرار
@@ -12539,6 +12641,106 @@ if False:  # IP_BLOCKER_ENABLED:
 
 print("⚠️ أنظمة الحماية معطلة مؤقتاً لحل مشكلة الحظر")
 print("🔓 يمكنك الآن الوصول للموقع بحرية")
+
+# ===== مسارات اللغات المتعددة =====
+
+@app.route('/change_language/<language>')
+def change_language(language=None):
+    """تغيير لغة التطبيق"""
+    if language and language in app.config['LANGUAGES']:
+        session['language'] = language
+        flash(_('تم تغيير اللغة بنجاح') if language == 'ar' else 'Language changed successfully', 'success')
+
+    # العودة للصفحة السابقة أو الرئيسية
+    return redirect(request.referrer or url_for('dashboard'))
+
+@app.route('/get_translations')
+def get_translations():
+    """الحصول على الترجمات للـ JavaScript"""
+    current_lang = get_locale()
+
+    translations = {
+        'ar': {
+            'welcome': 'مرحباً',
+            'dashboard': 'لوحة التحكم',
+            'customers': 'العملاء',
+            'suppliers': 'الموردين',
+            'products': 'المنتجات',
+            'sales': 'المبيعات',
+            'employees': 'الموظفين',
+            'reports': 'التقارير',
+            'settings': 'الإعدادات',
+            'logout': 'تسجيل الخروج',
+            'add': 'إضافة',
+            'edit': 'تعديل',
+            'delete': 'حذف',
+            'save': 'حفظ',
+            'cancel': 'إلغاء',
+            'confirm': 'تأكيد',
+            'success': 'نجح',
+            'error': 'خطأ',
+            'warning': 'تحذير',
+            'info': 'معلومات',
+            'loading': 'جاري التحميل...',
+            'search': 'بحث',
+            'print': 'طباعة',
+            'export': 'تصدير',
+            'total': 'الإجمالي',
+            'date': 'التاريخ',
+            'name': 'الاسم',
+            'phone': 'الهاتف',
+            'email': 'البريد الإلكتروني',
+            'address': 'العنوان',
+            'price': 'السعر',
+            'quantity': 'الكمية',
+            'description': 'الوصف',
+            'category': 'الفئة',
+            'status': 'الحالة',
+            'actions': 'الإجراءات'
+        },
+        'en': {
+            'welcome': 'Welcome',
+            'dashboard': 'Dashboard',
+            'customers': 'Customers',
+            'suppliers': 'Suppliers',
+            'products': 'Products',
+            'sales': 'Sales',
+            'employees': 'Employees',
+            'reports': 'Reports',
+            'settings': 'Settings',
+            'logout': 'Logout',
+            'add': 'Add',
+            'edit': 'Edit',
+            'delete': 'Delete',
+            'save': 'Save',
+            'cancel': 'Cancel',
+            'confirm': 'Confirm',
+            'success': 'Success',
+            'error': 'Error',
+            'warning': 'Warning',
+            'info': 'Information',
+            'loading': 'Loading...',
+            'search': 'Search',
+            'print': 'Print',
+            'export': 'Export',
+            'total': 'Total',
+            'date': 'Date',
+            'name': 'Name',
+            'phone': 'Phone',
+            'email': 'Email',
+            'address': 'Address',
+            'price': 'Price',
+            'quantity': 'Quantity',
+            'description': 'Description',
+            'category': 'Category',
+            'status': 'Status',
+            'actions': 'Actions'
+        }
+    }
+
+    return jsonify(translations.get(current_lang, translations['ar']))
+
+# ===== مسارات الطوارئ =====
 
 # مسار طوارئ لإلغاء الحظر
 @app.route('/emergency/unblock')

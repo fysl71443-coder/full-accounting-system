@@ -1,0 +1,325 @@
+# Arabic translations for Accounting System.
+# Copyright (C) 2024 Accounting System
+# This file is distributed under the same license as the Accounting System project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2024.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Accounting System 1.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2024-08-02 16:46+0000\n"
+"PO-Revision-Date: 2024-08-02 16:46+0000\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ar\n"
+"Language-Team: ar <LL@li.org>\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.13.1\n"
+
+msgid "تم تغيير اللغة بنجاح"
+msgstr "تم تغيير اللغة بنجاح"
+
+msgid "مرحباً"
+msgstr "مرحباً"
+
+msgid "لوحة التحكم"
+msgstr "لوحة التحكم"
+
+msgid "العملاء"
+msgstr "العملاء"
+
+msgid "الموردين"
+msgstr "الموردين"
+
+msgid "المنتجات"
+msgstr "المنتجات"
+
+msgid "المبيعات"
+msgstr "المبيعات"
+
+msgid "الموظفين"
+msgstr "الموظفين"
+
+msgid "التقارير"
+msgstr "التقارير"
+
+msgid "الإعدادات"
+msgstr "الإعدادات"
+
+msgid "خروج"
+msgstr "خروج"
+
+msgid "إضافة"
+msgstr "إضافة"
+
+msgid "تعديل"
+msgstr "تعديل"
+
+msgid "حذف"
+msgstr "حذف"
+
+msgid "حفظ"
+msgstr "حفظ"
+
+msgid "إلغاء"
+msgstr "إلغاء"
+
+msgid "تأكيد"
+msgstr "تأكيد"
+
+msgid "نجح"
+msgstr "نجح"
+
+msgid "خطأ"
+msgstr "خطأ"
+
+msgid "تحذير"
+msgstr "تحذير"
+
+msgid "معلومات"
+msgstr "معلومات"
+
+msgid "جاري التحميل..."
+msgstr "جاري التحميل..."
+
+msgid "بحث"
+msgstr "بحث"
+
+msgid "طباعة"
+msgstr "طباعة"
+
+msgid "تصدير"
+msgstr "تصدير"
+
+msgid "الإجمالي"
+msgstr "الإجمالي"
+
+msgid "التاريخ"
+msgstr "التاريخ"
+
+msgid "الاسم"
+msgstr "الاسم"
+
+msgid "الهاتف"
+msgstr "الهاتف"
+
+msgid "البريد الإلكتروني"
+msgstr "البريد الإلكتروني"
+
+msgid "العنوان"
+msgstr "العنوان"
+
+msgid "السعر"
+msgstr "السعر"
+
+msgid "الكمية"
+msgstr "الكمية"
+
+msgid "الوصف"
+msgstr "الوصف"
+
+msgid "الفئة"
+msgstr "الفئة"
+
+msgid "الحالة"
+msgstr "الحالة"
+
+msgid "الإجراءات"
+msgstr "الإجراءات"
+
+msgid "نظام المحاسبة الاحترافي"
+msgstr "نظام المحاسبة الاحترافي"
+
+msgid "إجمالي العملاء"
+msgstr "إجمالي العملاء"
+
+msgid "إجمالي الموردين"
+msgstr "إجمالي الموردين"
+
+msgid "إجمالي المنتجات"
+msgstr "إجمالي المنتجات"
+
+msgid "إجمالي الموظفين"
+msgstr "إجمالي الموظفين"
+
+msgid "إجمالي المبيعات"
+msgstr "إجمالي المبيعات"
+
+msgid "إجمالي المشتريات"
+msgstr "إجمالي المشتريات"
+
+msgid "إجمالي المصروفات"
+msgstr "إجمالي المصروفات"
+
+msgid "صافي الربح"
+msgstr "صافي الربح"
+
+msgid "الوظائف الرئيسية"
+msgstr "الوظائف الرئيسية"
+
+msgid "إدارة العملاء"
+msgstr "إدارة العملاء"
+
+msgid "إدارة الموردين"
+msgstr "إدارة الموردين"
+
+msgid "إدارة المنتجات"
+msgstr "إدارة المنتجات"
+
+msgid "إدارة الموظفين"
+msgstr "إدارة الموظفين"
+
+msgid "فواتير المبيعات"
+msgstr "فواتير المبيعات"
+
+msgid "التقارير المالية"
+msgstr "التقارير المالية"
+
+msgid "تسجيل الدخول"
+msgstr "تسجيل الدخول"
+
+msgid "اسم المستخدم"
+msgstr "اسم المستخدم"
+
+msgid "كلمة المرور"
+msgstr "كلمة المرور"
+
+msgid "دخول"
+msgstr "دخول"
+
+msgid "الرئيسية"
+msgstr "الرئيسية"
+
+msgid "رجوع"
+msgstr "رجوع"
+
+msgid "تحديث"
+msgstr "تحديث"
+
+msgid "منخفض المخزون"
+msgstr "منخفض المخزون"
+
+msgid "نشط"
+msgstr "نشط"
+
+msgid "غير نشط"
+msgstr "غير نشط"
+
+msgid "معلق"
+msgstr "معلق"
+
+msgid "مكتمل"
+msgstr "مكتمل"
+
+msgid "ملغي"
+msgstr "ملغي"
+
+msgid "نقدي"
+msgstr "نقدي"
+
+msgid "بنكي"
+msgstr "بنكي"
+
+msgid "فيزا"
+msgstr "فيزا"
+
+msgid "ماستركارد"
+msgstr "ماستركارد"
+
+msgid "مدى"
+msgstr "مدى"
+
+msgid "تحويل بنكي"
+msgstr "تحويل بنكي"
+
+msgid "إضافة عميل جديد"
+msgstr "إضافة عميل جديد"
+
+msgid "تعديل العميل"
+msgstr "تعديل العميل"
+
+msgid "حذف العميل"
+msgstr "حذف العميل"
+
+msgid "عرض العميل"
+msgstr "عرض العميل"
+
+msgid "إضافة منتج جديد"
+msgstr "إضافة منتج جديد"
+
+msgid "تعديل المنتج"
+msgstr "تعديل المنتج"
+
+msgid "حذف المنتج"
+msgstr "حذف المنتج"
+
+msgid "عرض المنتج"
+msgstr "عرض المنتج"
+
+msgid "إضافة فاتورة جديدة"
+msgstr "إضافة فاتورة جديدة"
+
+msgid "تعديل الفاتورة"
+msgstr "تعديل الفاتورة"
+
+msgid "حذف الفاتورة"
+msgstr "حذف الفاتورة"
+
+msgid "عرض الفاتورة"
+msgstr "عرض الفاتورة"
+
+msgid "طباعة الفاتورة"
+msgstr "طباعة الفاتورة"
+
+msgid "تصدير PDF"
+msgstr "تصدير PDF"
+
+msgid "تصدير Excel"
+msgstr "تصدير Excel"
+
+msgid "البحث في النتائج"
+msgstr "البحث في النتائج"
+
+msgid "لا توجد نتائج"
+msgstr "لا توجد نتائج"
+
+msgid "تم الحفظ بنجاح"
+msgstr "تم الحفظ بنجاح"
+
+msgid "تم التحديث بنجاح"
+msgstr "تم التحديث بنجاح"
+
+msgid "تم الحذف بنجاح"
+msgstr "تم الحذف بنجاح"
+
+msgid "حدث خطأ"
+msgstr "حدث خطأ"
+
+msgid "هل أنت متأكد؟"
+msgstr "هل أنت متأكد؟"
+
+msgid "لا يمكن التراجع عن هذا الإجراء"
+msgstr "لا يمكن التراجع عن هذا الإجراء"
+
+msgid "نعم، احذف"
+msgstr "نعم، احذف"
+
+msgid "لا، إلغاء"
+msgstr "لا، إلغاء"
+
+msgid "البيانات مطلوبة"
+msgstr "البيانات مطلوبة"
+
+msgid "البريد الإلكتروني غير صحيح"
+msgstr "البريد الإلكتروني غير صحيح"
+
+msgid "رقم الهاتف غير صحيح"
+msgstr "رقم الهاتف غير صحيح"
+
+msgid "السعر يجب أن يكون رقم موجب"
+msgstr "السعر يجب أن يكون رقم موجب"
+
+msgid "الكمية يجب أن تكون رقم موجب"
+msgstr "الكمية يجب أن تكون رقم موجب"

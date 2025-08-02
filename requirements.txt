@@ -7,6 +7,10 @@ Flask-SQLAlchemy==3.0.5
 # Authentication
 Flask-Login==0.6.3
 
+# Internationalization (i18n)
+Flask-Babel==4.0.0
+Babel==2.13.1
+
 # Security and utilities
 Werkzeug>=2.3.0,<3.0.0
 
