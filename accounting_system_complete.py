@@ -3460,6 +3460,156 @@ def sales():
     customers = Customer.query.all()
     total_sales = sum(sale.total for sale in sales)
 
+    # Add discount logic
+    for sale in sales:
+        sale.discounted_total = sale.total - (getattr(sale, 'discount', 0) or 0)
+
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>فواتير المبيعات - نظام المحاسبة الاحترافي</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            body {
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+            .navbar {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            }
+            .stat-card {
+                background: white;
+                border-radius: 20px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                transition: all 0.3s ease;
+                border: none;
+                overflow: hidden;
+            }
+            .stat-card:hover {
+                transform: translateY(-10px);
+                box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            }
+            .table-container {
+                background: white;
+                border-radius: 20px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                overflow: hidden;
+            }
+            .btn-action {
+                border-radius: 10px;
+                padding: 0.5rem 1rem;
+                margin: 0.2rem;
+                transition: all 0.3s ease;
+            }
+            .btn-action:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-calculator me-2"></i>نظام المحاسبة الاحترافي
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="javascript:history.back()">
+                        <i class="fas fa-arrow-right me-1"></i>رجوع
+                    </a>
+                    <a class="nav-link" href="{{ url_for('dashboard') }}">
+                        <i class="fas fa-home me-1"></i>الرئيسية
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <!-- عنوان الصفحة -->
+            <div class="text-center mb-5">
+                <h1 class="display-4 fw-bold text-success">
+                    <i class="fas fa-file-invoice me-3"></i>فواتير المبيعات
+                </h1>
+                <p class="lead text-muted">إدارة وتتبع جميع فواتير المبيعات</p>
+            </div>
+
+            <!-- إحصائيات المبيعات -->
+            <div class="row g-4 mb-5">
+                <div class="col-md-4">
+                    <div class="stat-card text-center p-4">
+                        <div class="text-primary mb-3">
+                            <i class="fas fa-users fa-3x"></i>
+                        </div>
+                        <h3 class="fw-bold text-primary">{{ customers|length }}</h3>
+                        <p class="text-muted mb-0">العملاء المسجلين</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- قائمة الفواتير -->
+            <div class="table-container">
+                <div class="card-header bg-success text-white p-4 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-file-invoice me-2"></i>قائمة فواتير المبيعات</h5>
+                    <button type="button" class="btn btn-light btn-lg" data-bs-toggle="modal" data-bs-target="#addSaleModal">
+                        <i class="fas fa-plus me-2"></i>فاتورة مبيعات جديدة
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    {% if sales %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" id="salesTable">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>رقم الفاتورة</th>
+                                    <th>العميل</th>
+                                    <th>التاريخ</th>
+                                    <th>الإجمالي</th>
+                                    <th>الخصم</th>
+                                    <th>الإجمالي بعد الخصم</th>
+                                    <th>الحالة</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sale in sales %}
+                                <tr>
+                                    <td>{{ sale.invoice_number }}</td>
+                                    <td>{{ sale.customer.name if sale.customer else 'عميل نقدي' }}</td>
+                                    <td>{{ sale.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>{{ "%.2f"|format(sale.total) }} ر.س</td>
+                                    <td>{{ "%.2f"|format(sale.discount or 0) }} ر.س</td>
+                                    <td>{{ "%.2f"|format(sale.discounted_total) }} ر.س</td>
+                                    <td>{{ sale.status }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <div class="mb-4">
+                            <i class="fas fa-file-invoice fa-4x text-muted mb-3"></i>
+                            <h4 class="text-muted">لا توجد فواتير مبيعات</h4>
+                            <p class="text-muted">ابدأ بإنشاء أول فاتورة مبيعات</p>
+                        </div>
+                        <button type="button" class="btn btn-secondary btn-lg" data-bs-toggle="modal" data-bs-target="#addSaleModal">
+                            <i class="fas fa-plus me-2"></i>إنشاء فاتورة مبيعات جديدة
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    ''', sales=sales, customers=customers, total_sales=total_sales)
+    sales = SalesInvoice.query.order_by(SalesInvoice.created_at.desc()).all()
+    customers = Customer.query.all()
+    total_sales = sum(sale.total for sale in sales)
+
     return render_template_string('''
     <!DOCTYPE html>
     <html dir="rtl" lang="ar">
@@ -4098,6 +4248,10 @@ def purchases():
     suppliers = Supplier.query.all()
     total_purchases = sum(purchase.total for purchase in purchases)
 
+    # Add discount logic
+    for purchase in purchases:
+        purchase.discounted_total = purchase.total - (getattr(purchase, 'discount', 0) or 0)
+
     return render_template_string('''
     <!DOCTYPE html>
     <html dir="rtl" lang="ar">
@@ -4168,7 +4322,7 @@ def purchases():
                 <h1 class="display-4 fw-bold text-secondary">
                     <i class="fas fa-shopping-cart me-3"></i>فواتير المشتريات
                 </h1>
-                <p class="lead text-muted">إدارة وتتبع جميع فواتير المشتريات والموردين</p>
+                <p class="lead text-muted">إدارة وتتبع جميع فواتير المشتريات</p>
             </div>
 
             <!-- إحصائيات المشتريات -->
@@ -4182,14 +4336,176 @@ def purchases():
                         <p class="text-muted mb-0">إجمالي فواتير المشتريات</p>
                     </div>
                 </div>
+            </div>
+
+            <!-- قائمة الفواتير -->
+            <div class="table-container">
+                <div class="card-header bg-secondary text-white p-4 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-shopping-cart me-2"></i>قائمة فواتير المشتريات</h5>
+                    <button type="button" class="btn btn-light btn-lg" data-bs-toggle="modal" data-bs-target="#addPurchaseModal">
+                        <i class="fas fa-plus me-2"></i>فاتورة مشتريات جديدة
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    {% if purchases %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" id="purchasesTable">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>رقم الفاتورة</th>
+                                    <th>المورد</th>
+                                    <th>التاريخ</th>
+                                    <th>الإجمالي</th>
+                                    <th>الخصم</th>
+                                    <th>الإجمالي بعد الخصم</th>
+                                    <th>الحالة</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for purchase in purchases %}
+                                <tr>
+                                    <td>{{ purchase.invoice_number }}</td>
+                                    <td>{{ purchase.supplier.name if purchase.supplier else 'مورد غير محدد' }}</td>
+                                    <td>{{ purchase.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>{{ "%.2f"|format(purchase.total) }} ر.س</td>
+                                    <td>{{ "%.2f"|format(purchase.discount or 0) }} ر.س</td>
+                                    <td>{{ "%.2f"|format(purchase.discounted_total) }} ر.س</td>
+                                    <td>{{ purchase.status }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <div class="mb-4">
+                            <i class="fas fa-shopping-cart fa-4x text-muted mb-3"></i>
+                            <h4 class="text-muted">لا توجد فواتير مشتريات</h4>
+                            <p class="text-muted">ابدأ بإنشاء أول فاتورة مشتريات</p>
+                        </div>
+                        <button type="button" class="btn btn-secondary btn-lg" data-bs-toggle="modal" data-bs-target="#addPurchaseModal">
+                            <i class="fas fa-plus me-2"></i>إنشاء فاتورة مشتريات جديدة
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    ''', purchases=purchases, suppliers=suppliers, total_purchases=total_purchases)
+    purchases = PurchaseInvoice.query.order_by(PurchaseInvoice.created_at.desc()).all()
+    suppliers = Supplier.query.all()
+    total_purchases = sum(purchase.total for purchase in purchases)
+
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="{{ 'rtl' if get_locale() == 'ar' else 'ltr' }}" lang="{{ get_locale() }}">
+    <head>
+        <meta charset="UTF-8">
+        <title>{{ _('فواتير المشتريات') }} - {{ _('نظام المحاسبة الاحترافي') }}</title>
+        {% if get_locale() == 'ar' %}
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        {% else %}
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        {% endif %}
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <style>
+            body {
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+            .navbar {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            }
+            .stat-card {
+                background: white;
+                border-radius: 20px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                transition: all 0.3s ease;
+                border: none;
+                overflow: hidden;
+            }
+            .stat-card:hover {
+                transform: translateY(-10px);
+                box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            }
+            .table-container {
+                background: white;
+                border-radius: 20px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                overflow: hidden;
+            }
+            .btn-action {
+                border-radius: 10px;
+                padding: 0.5rem 1rem;
+                margin: 0.2rem;
+                transition: all 0.3s ease;
+            }
+            .btn-action:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container">
+                <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-calculator me-2"></i>{{ _('نظام المحاسبة الاحترافي') }}
+                </a>
+
+                <!-- Language Switcher -->
+                <div class="navbar-nav {{ 'me-auto' if get_locale() == 'ar' else 'ms-auto' }}">
+                    <div class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle text-white" href="#" id="languageDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-globe me-2"></i>
+                            {{ 'العربية' if get_locale() == 'ar' else 'English' }}
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('change_language', language='ar') }}">العربية</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('change_language', language='en') }}">English</a></li>
+                        </ul>
+                    </div>
+
+                    <a class="nav-link" href="javascript:history.back()">
+                        <i class="fas fa-arrow-{{ 'right' if get_locale() == 'ar' else 'left' }} me-1"></i>{{ _('رجوع') }}
+                    </a>
+                    <a class="nav-link" href="{{ url_for('dashboard') }}">
+                        <i class="fas fa-home me-1"></i>{{ _('الرئيسية') }}
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <!-- عنوان الصفحة -->
+            <div class="text-center mb-5">
+                <h1 class="display-4 fw-bold text-secondary">
+                    <i class="fas fa-shopping-cart {{ 'me-3' if get_locale() == 'ar' else 'ms-3' }}"></i>{{ _('فواتير المشتريات') }}
+                </h1>
+                <p class="lead text-muted">{{ _('إدارة وتتبع جميع فواتير المشتريات والموردين') }}</p>
+            </div>
+
+            <!-- إحصائيات المشتريات -->
+            <div class="row g-4 mb-5">
+                <div class="col-md-4">
+                    <div class="stat-card text-center p-4">
+                        <div class="text-secondary mb-3">
+                            <i class="fas fa-shopping-cart fa-3x"></i>
+                        </div>
+                        <h3 class="fw-bold text-secondary">{{ purchases|length }}</h3>
+                        <p class="text-muted mb-0">{{ _('إجمالي فواتير المشتريات') }}</p>
+                    </div>
+                </div>
                 <div class="col-md-4">
                     <div class="stat-card text-center p-4">
                         <div class="text-danger mb-3">
                             <i class="fas fa-money-bill-wave fa-3x"></i>
                         </div>
                         <h3 class="fw-bold text-danger">{{ "%.2f"|format(total_purchases) }}</h3>
-                        <p class="text-muted mb-0">إجمالي قيمة المشتريات (ر.س)</p>
-                            <p class="mb-0">إجمالي قيمة المشتريات</p>
+                        <p class="text-muted mb-0">{{ _('إجمالي قيمة المشتريات') }} ({{ _('ر.س') }})</p>
                         </div>
                     </div>
                 </div>
@@ -11033,6 +11349,79 @@ def api_statistics():
 
 # ===== نظام إدارة المستخدمين =====
 
+@app.route('/vat_report')
+@login_required
+def vat_report():
+    from io import BytesIO
+    from flask import send_file
+    import pandas as pd
+    from fpdf import FPDF
+
+    # Calculate VAT
+    sales = SalesInvoice.query.all()
+    purchases = PurchaseInvoice.query.all()
+
+    total_sales_vat = sum((sale.total - (getattr(sale, 'discount', 0) or 0)) * 0.15 for sale in sales)
+    total_purchases_vat = sum((purchase.total - (getattr(purchase, 'discount', 0) or 0)) * 0.15 for purchase in purchases)
+    net_vat = total_sales_vat - total_purchases_vat
+
+    # Render the VAT report page
+    if request.args.get('format') == 'pdf':
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font('Arial', 'B', 16)
+        pdf.cell(200, 10, 'VAT Report', ln=True, align='C')
+        pdf.ln(10)
+        pdf.set_font('Arial', '', 12)
+        pdf.cell(200, 10, f'Total Sales VAT: {total_sales_vat:.2f} SAR', ln=True)
+        pdf.cell(200, 10, f'Total Purchases VAT: {total_purchases_vat:.2f} SAR', ln=True)
+        pdf.cell(200, 10, f'Net VAT: {net_vat:.2f} SAR', ln=True)
+
+        pdf_output = BytesIO()
+        pdf.output(pdf_output)
+        pdf_output.seek(0)
+        return send_file(pdf_output, as_attachment=True, download_name='vat_report.pdf', mimetype='application/pdf')
+
+    elif request.args.get('format') == 'excel':
+        data = {
+            'Description': ['Total Sales VAT', 'Total Purchases VAT', 'Net VAT'],
+            'Amount (SAR)': [total_sales_vat, total_purchases_vat, net_vat]
+        }
+        df = pd.DataFrame(data)
+
+        excel_output = BytesIO()
+        with pd.ExcelWriter(excel_output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False, sheet_name='VAT Report')
+        excel_output.seek(0)
+        return send_file(excel_output, as_attachment=True, download_name='vat_report.xlsx', mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html dir="rtl" lang="ar">
+    <head>
+        <meta charset="UTF-8">
+        <title>تقرير ضريبة القيمة المضافة</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    </head>
+    <body>
+        <div class="container mt-4">
+            <h1 class="text-center">تقرير ضريبة القيمة المضافة</h1>
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h5>إجمالي ضريبة المبيعات: {{ total_sales_vat }} ر.س</h5>
+                    <h5>إجمالي ضريبة المشتريات: {{ total_purchases_vat }} ر.س</h5>
+                    <h5>صافي الضريبة المستحقة: {{ net_vat }} ر.س</h5>
+                </div>
+            </div>
+            <div class="mt-4">
+                <a href="{{ url_for('vat_report', format='pdf') }}" class="btn btn-primary">تحميل التقرير كـ PDF</a>
+                <a href="{{ url_for('vat_report', format='excel') }}" class="btn btn-success">تحميل التقرير كـ Excel</a>
+            </div>
+        </div>
+    </body>
+    </html>
+    ''', total_sales_vat=total_sales_vat, total_purchases_vat=total_purchases_vat, net_vat=net_vat)
+
 @app.route('/users')
 @login_required
 def users():
@@ -11043,11 +11432,15 @@ def users():
     users = User.query.all()
     return render_template_string('''
     <!DOCTYPE html>
-    <html dir="rtl" lang="ar">
+    <html dir="{{ 'rtl' if get_locale() == 'ar' else 'ltr' }}" lang="{{ get_locale() }}">
     <head>
         <meta charset="UTF-8">
-        <title>إدارة المستخدمين - نظام المحاسبة</title>
+        <title>{{ _('إدارة المستخدمين') }} - {{ _('نظام المحاسبة') }}</title>
+        {% if get_locale() == 'ar' %}
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        {% else %}
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        {% endif %}
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
         <style>
             body { background-color: #f8f9fa; }
@@ -11058,14 +11451,27 @@ def users():
         <nav class="navbar navbar-expand-lg navbar-dark">
             <div class="container">
                 <a class="navbar-brand" href="{{ url_for('dashboard') }}">
-                    <i class="fas fa-calculator me-2"></i>نظام المحاسبة
+                    <i class="fas fa-calculator me-2"></i>{{ _('نظام المحاسبة') }}
                 </a>
-                <div class="navbar-nav ms-auto">
+
+                <!-- Language Switcher -->
+                <div class="navbar-nav {{ 'me-auto' if get_locale() == 'ar' else 'ms-auto' }}">
+                    <div class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle text-white" href="#" id="languageDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-globe me-2"></i>
+                            {{ 'العربية' if get_locale() == 'ar' else 'English' }}
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('change_language', language='ar') }}">العربية</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('change_language', language='en') }}">English</a></li>
+                        </ul>
+                    </div>
+
                     <a class="nav-link" href="javascript:history.back()">
-                        <i class="fas fa-arrow-right me-1"></i>رجوع
+                        <i class="fas fa-arrow-{{ 'right' if get_locale() == 'ar' else 'left' }} me-1"></i>{{ _('رجوع') }}
                     </a>
                     <a class="nav-link" href="{{ url_for('dashboard') }}">
-                        <i class="fas fa-home me-1"></i>الرئيسية
+                        <i class="fas fa-home me-1"></i>{{ _('الرئيسية') }}
                     </a>
                 </div>
             </div>
@@ -11074,9 +11480,9 @@ def users():
         <div class="container mt-4">
             <div class="card shadow">
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="fas fa-users-cog me-2"></i>إدارة المستخدمين</h5>
+                    <h5 class="mb-0"><i class="fas fa-users-cog {{ 'me-2' if get_locale() == 'ar' else 'ms-2' }}"></i>{{ _('إدارة المستخدمين') }}</h5>
                     <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#addUserModal">
-                        <i class="fas fa-plus me-2"></i>إضافة مستخدم جديد
+                        <i class="fas fa-plus {{ 'me-2' if get_locale() == 'ar' else 'ms-2' }}"></i>{{ _('إضافة مستخدم جديد') }}
                     </button>
                 </div>
                 <div class="card-body">
@@ -11084,11 +11490,11 @@ def users():
                         <table class="table table-hover">
                             <thead class="table-dark">
                                 <tr>
-                                    <th>اسم المستخدم</th>
-                                    <th>الاسم الكامل</th>
-                                    <th>الدور</th>
-                                    <th>تاريخ الإنشاء</th>
-                                    <th>الإجراءات</th>
+                                    <th>{{ _('اسم المستخدم') }}</th>
+                                    <th>{{ _('الاسم الكامل') }}</th>
+                                    <th>{{ _('الدور') }}</th>
+                                    <th>{{ _('تاريخ الإنشاء') }}</th>
+                                    <th>{{ _('الإجراءات') }}</th>
                                 </tr>
                             </thead>
                             <tbody>

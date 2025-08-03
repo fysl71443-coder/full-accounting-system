@@ -1,0 +1,360 @@
+# Arabic translations for Meal Costs Application.
+# Copyright (C) 2024
+# This file is distributed under the same license as the Meal Costs Application project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2024.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Meal Costs Application 1.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2024-08-03 14:00+0300\n"
+"PO-Revision-Date: 2024-08-03 14:00+0300\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: ar\n"
+"Language-Team: ar <LL@li.org>\n"
+"Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.12.1\n"
+
+# Navigation and Main Interface
+msgid "تكاليف الوجبات"
+msgstr "تكاليف الوجبات"
+
+msgid "Meal Costs"
+msgstr "تكاليف الوجبات"
+
+msgid "نظام إدارة تكاليف الوجبات"
+msgstr "نظام إدارة تكاليف الوجبات"
+
+msgid "Meal Cost Management System"
+msgstr "نظام إدارة تكاليف الوجبات"
+
+# Language Switching
+msgid "تم تغيير اللغة بنجاح"
+msgstr "تم تغيير اللغة بنجاح"
+
+msgid "Language changed successfully"
+msgstr "تم تغيير اللغة بنجاح"
+
+msgid "اللغة المطلوبة غير مدعومة"
+msgstr "اللغة المطلوبة غير مدعومة"
+
+msgid "Requested language is not supported"
+msgstr "اللغة المطلوبة غير مدعومة"
+
+# Tabs
+msgid "المكونات"
+msgstr "المكونات"
+
+msgid "Ingredients"
+msgstr "المكونات"
+
+msgid "الوجبات"
+msgstr "الوجبات"
+
+msgid "Meals"
+msgstr "الوجبات"
+
+msgid "وصفات الوجبات"
+msgstr "وصفات الوجبات"
+
+msgid "Meal Recipes"
+msgstr "وصفات الوجبات"
+
+msgid "حساب تكلفة الوجبة"
+msgstr "حساب تكلفة الوجبة"
+
+msgid "Calculate Meal Cost"
+msgstr "حساب تكلفة الوجبة"
+
+# Form Labels
+msgid "اسم المكون"
+msgstr "اسم المكون"
+
+msgid "Ingredient Name"
+msgstr "اسم المكون"
+
+msgid "تكلفة الوحدة"
+msgstr "تكلفة الوحدة"
+
+msgid "Unit Cost"
+msgstr "تكلفة الوحدة"
+
+msgid "الكمية في المخزون"
+msgstr "الكمية في المخزون"
+
+msgid "Stock Quantity"
+msgstr "الكمية في المخزون"
+
+msgid "اسم الوجبة"
+msgstr "اسم الوجبة"
+
+msgid "Meal Name"
+msgstr "اسم الوجبة"
+
+msgid "اختر الوجبة"
+msgstr "اختر الوجبة"
+
+msgid "Select Meal"
+msgstr "اختر الوجبة"
+
+msgid "اختر المكون"
+msgstr "اختر المكون"
+
+msgid "Select Ingredient"
+msgstr "اختر المكون"
+
+msgid "الكمية المطلوبة للوصفة"
+msgstr "الكمية المطلوبة للوصفة"
+
+msgid "Required Quantity for Recipe"
+msgstr "الكمية المطلوبة للوصفة"
+
+# Buttons
+msgid "أضف مكون"
+msgstr "أضف مكون"
+
+msgid "Add Ingredient"
+msgstr "أضف مكون"
+
+msgid "أضف وجبة"
+msgstr "أضف وجبة"
+
+msgid "Add Meal"
+msgstr "أضف وجبة"
+
+msgid "أضف مكون للوصفة"
+msgstr "أضف مكون للوصفة"
+
+msgid "Add Ingredient to Recipe"
+msgstr "أضف مكون للوصفة"
+
+msgid "احسب التكلفة"
+msgstr "احسب التكلفة"
+
+msgid "Calculate Cost"
+msgstr "احسب التكلفة"
+
+# Success Messages
+msgid "✅ تم إضافة مكون جديد: %(name)s"
+msgstr "✅ تم إضافة مكون جديد: %(name)s"
+
+msgid "✅ New ingredient added: %(name)s"
+msgstr "✅ تم إضافة مكون جديد: %(name)s"
+
+msgid "✅ تم إضافة وجبة جديدة: %(name)s"
+msgstr "✅ تم إضافة وجبة جديدة: %(name)s"
+
+msgid "✅ New meal added: %(name)s"
+msgstr "✅ تم إضافة وجبة جديدة: %(name)s"
+
+msgid "✅ تم إضافة مكون للوصفة"
+msgstr "✅ تم إضافة مكون للوصفة"
+
+msgid "✅ Ingredient added to recipe"
+msgstr "✅ تم إضافة مكون للوصفة"
+
+msgid "✅ تم خصم المكونات من المخزون بنجاح"
+msgstr "✅ تم خصم المكونات من المخزون بنجاح"
+
+msgid "✅ Ingredients deducted from inventory successfully"
+msgstr "✅ تم خصم المكونات من المخزون بنجاح"
+
+# Error Messages
+msgid "❌ يرجى إدخال اسم المكون"
+msgstr "❌ يرجى إدخال اسم المكون"
+
+msgid "❌ Please enter ingredient name"
+msgstr "❌ يرجى إدخال اسم المكون"
+
+msgid "❌ يجب أن تكون تكلفة الوحدة أكبر من صفر"
+msgstr "❌ يجب أن تكون تكلفة الوحدة أكبر من صفر"
+
+msgid "❌ Unit cost must be greater than zero"
+msgstr "❌ يجب أن تكون تكلفة الوحدة أكبر من صفر"
+
+msgid "❌ يجب أن تكون الكمية في المخزون صفر أو أكبر"
+msgstr "❌ يجب أن تكون الكمية في المخزون صفر أو أكبر"
+
+msgid "❌ Stock quantity must be zero or greater"
+msgstr "❌ يجب أن تكون الكمية في المخزون صفر أو أكبر"
+
+msgid "❌ المكون \"%(name)s\" موجود بالفعل"
+msgstr "❌ المكون \"%(name)s\" موجود بالفعل"
+
+msgid "❌ Ingredient \"%(name)s\" already exists"
+msgstr "❌ المكون \"%(name)s\" موجود بالفعل"
+
+msgid "❌ يرجى إدخال قيم صحيحة للتكلفة والكمية"
+msgstr "❌ يرجى إدخال قيم صحيحة للتكلفة والكمية"
+
+msgid "❌ Please enter valid values for cost and quantity"
+msgstr "❌ يرجى إدخال قيم صحيحة للتكلفة والكمية"
+
+msgid "❌ يرجى إدخال اسم الوجبة"
+msgstr "❌ يرجى إدخال اسم الوجبة"
+
+msgid "❌ Please enter meal name"
+msgstr "❌ يرجى إدخال اسم الوجبة"
+
+msgid "❌ الوجبة \"%(name)s\" موجودة بالفعل"
+msgstr "❌ الوجبة \"%(name)s\" موجودة بالفعل"
+
+msgid "❌ Meal \"%(name)s\" already exists"
+msgstr "❌ الوجبة \"%(name)s\" موجودة بالفعل"
+
+# Table Headers
+msgid "القيمة الإجمالية"
+msgstr "القيمة الإجمالية"
+
+msgid "Total Value"
+msgstr "القيمة الإجمالية"
+
+msgid "الحالة"
+msgstr "الحالة"
+
+msgid "Status"
+msgstr "الحالة"
+
+msgid "متوفر"
+msgstr "متوفر"
+
+msgid "Available"
+msgstr "متوفر"
+
+msgid "قليل"
+msgstr "قليل"
+
+msgid "Low"
+msgstr "قليل"
+
+msgid "نفد"
+msgstr "نفد"
+
+msgid "Out of Stock"
+msgstr "نفد"
+
+# Statistics
+msgid "المكونات المتاحة"
+msgstr "المكونات المتاحة"
+
+msgid "Available Ingredients"
+msgstr "المكونات المتاحة"
+
+msgid "الوجبات المسجلة"
+msgstr "الوجبات المسجلة"
+
+msgid "Registered Meals"
+msgstr "الوجبات المسجلة"
+
+msgid "وصفات الطبخ"
+msgstr "وصفات الطبخ"
+
+msgid "Cooking Recipes"
+msgstr "وصفات الطبخ"
+
+msgid "إجمالي المخزون"
+msgstr "إجمالي المخزون"
+
+msgid "Total Inventory"
+msgstr "إجمالي المخزون"
+
+# Purchases Screen
+msgid "فواتير المشتريات"
+msgstr "فواتير المشتريات"
+
+msgid "Purchase Invoices"
+msgstr "فواتير المشتريات"
+
+msgid "نظام المحاسبة الاحترافي"
+msgstr "نظام المحاسبة الاحترافي"
+
+msgid "Professional Accounting System"
+msgstr "نظام المحاسبة الاحترافي"
+
+msgid "إدارة وتتبع جميع فواتير المشتريات والموردين"
+msgstr "إدارة وتتبع جميع فواتير المشتريات والموردين"
+
+msgid "Manage and track all purchase invoices and suppliers"
+msgstr "إدارة وتتبع جميع فواتير المشتريات والموردين"
+
+msgid "إجمالي فواتير المشتريات"
+msgstr "إجمالي فواتير المشتريات"
+
+msgid "Total Purchase Invoices"
+msgstr "إجمالي فواتير المشتريات"
+
+msgid "إجمالي قيمة المشتريات"
+msgstr "إجمالي قيمة المشتريات"
+
+msgid "Total Purchase Value"
+msgstr "إجمالي قيمة المشتريات"
+
+msgid "ر.س"
+msgstr "ر.س"
+
+msgid "SAR"
+msgstr "ر.س"
+
+msgid "رجوع"
+msgstr "رجوع"
+
+msgid "Back"
+msgstr "رجوع"
+
+msgid "الرئيسية"
+msgstr "الرئيسية"
+
+msgid "Home"
+msgstr "الرئيسية"
+
+# Users Management Screen
+msgid "إدارة المستخدمين"
+msgstr "إدارة المستخدمين"
+
+msgid "User Management"
+msgstr "إدارة المستخدمين"
+
+msgid "نظام المحاسبة"
+msgstr "نظام المحاسبة"
+
+msgid "Accounting System"
+msgstr "نظام المحاسبة"
+
+msgid "إضافة مستخدم جديد"
+msgstr "إضافة مستخدم جديد"
+
+msgid "Add New User"
+msgstr "إضافة مستخدم جديد"
+
+msgid "اسم المستخدم"
+msgstr "اسم المستخدم"
+
+msgid "Username"
+msgstr "اسم المستخدم"
+
+msgid "الاسم الكامل"
+msgstr "الاسم الكامل"
+
+msgid "Full Name"
+msgstr "الاسم الكامل"
+
+msgid "الدور"
+msgstr "الدور"
+
+msgid "Role"
+msgstr "الدور"
+
+msgid "تاريخ الإنشاء"
+msgstr "تاريخ الإنشاء"
+
+msgid "Creation Date"
+msgstr "تاريخ الإنشاء"
+
+msgid "الإجراءات"
+msgstr "الإجراءات"
+
+msgid "Actions"
+msgstr "الإجراءات"
